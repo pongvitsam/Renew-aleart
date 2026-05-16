@@ -18,7 +18,7 @@ function onProjectsLoaded(res) {
   hideSetupBanner();
   hideSyncIndicator();
   if (!App.projects.length && !res._syncing) {
-    showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
+    showSetupBanner('ยังไม่มีโครงการ — กด "สร้างโครงการใหม่"');
   } else if (res._empty && App._syncing) {
     showSetupBanner('กำลังซิงค์ข้อมูลจากเซิร์ฟเวอร์ครั้งแรก — อาจใช้เวลาสักครู่');
   }

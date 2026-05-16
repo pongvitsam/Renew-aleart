@@ -65,7 +65,7 @@ function showDashboard() {
   if (!sortedProjects.length) {
     const empty = document.createElement('p');
     empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed mb-8';
-    empty.textContent = 'ยังไม่มีโครงการ — กดโหลดข้อมูลทดลองหรือสร้างโครงการใหม่';
+    empty.textContent = 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
     content.appendChild(empty);
   } else {
     content.appendChild(renderProjectsByPriority(sortedProjects));

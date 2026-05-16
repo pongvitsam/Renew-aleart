@@ -84,21 +84,6 @@ async function deleteDepartment(id) {
   }
 }
 
-async function loadDemoData() {
-  Utils.setLoading(true);
-  try {
-    const res = await Api.seedMockData({ force: false });
-    applyServerData(res);
-    renderSidebar();
-    showDashboard();
-    showToast(res.message || 'โหลดข้อมูลทดลองแล้ว');
-  } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
-  }
-}
-
 Object.assign(window, {
-  openDepartmentModal, addDepartment, deleteDepartment, loadDemoData, populateDepartmentSelect
+  openDepartmentModal, addDepartment, deleteDepartment, populateDepartmentSelect
 });

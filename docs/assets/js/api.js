@@ -245,10 +245,4 @@ const Api = {
     });
   },
 
-  seedMockData(data) {
-    return this.call('seedMockData', data || {}, { skipCache: true, timeoutMs: 120000 }).then(res => {
-      if (res.projects) this.applyPayload(res);
-      return res;
-    });
-  }
 };

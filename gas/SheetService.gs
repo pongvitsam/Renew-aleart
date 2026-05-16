@@ -6,7 +6,6 @@ var SheetService = (function () {
     initSheets_(ss);
     PropertiesService.getScriptProperties().setProperty(SCHEMA_READY_KEY_, '1');
     DepartmentService.seedDefaultsIfEmpty_();
-    MockDataService.seedMockData(false);
     return { spreadsheetId: ss.getId(), url: ss.getUrl() };
   }
 

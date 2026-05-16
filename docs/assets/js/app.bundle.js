@@ -697,12 +697,6 @@ const Api = {
     });
   },
 
-  seedMockData(data) {
-    return this.call('seedMockData', data || {}, { skipCache: true, timeoutMs: 120000 }).then(res => {
-      if (res.projects) this.applyPayload(res);
-      return res;
-    });
-  }
 };
 
 /* app-index.js */
@@ -742,7 +736,7 @@ function onProjectsLoaded(res) {
   hideSetupBanner();
   hideSyncIndicator();
   if (!App.projects.length && !res._syncing) {
-    showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
+    showSetupBanner('ยังไม่มีโครงการ — กด "สร้างโครงการใหม่"');
   } else if (res._empty && App._syncing) {
     showSetupBanner('กำลังซิงค์ข้อมูลจากเซิร์ฟเวอร์ครั้งแรก — อาจใช้เวลาสักครู่');
   }
@@ -949,23 +943,8 @@ async function deleteDepartment(id) {
   }
 }
 
-async function loadDemoData() {
-  Utils.setLoading(true);
-  try {
-    const res = await Api.seedMockData({ force: false });
-    applyServerData(res);
-    renderSidebar();
-    showDashboard();
-    showToast(res.message || 'โหลดข้อมูลทดลองแล้ว');
-  } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
-  }
-}
-
 Object.assign(window, {
-  openDepartmentModal, addDepartment, deleteDepartment, loadDemoData, populateDepartmentSelect
+  openDepartmentModal, addDepartment, deleteDepartment, populateDepartmentSelect
 });
 
 /* app-sidebar.js */
@@ -1792,7 +1771,7 @@ function showDashboard() {
   if (!sortedProjects.length) {
     const empty = document.createElement('p');
     empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed mb-8';
-    empty.textContent = 'ยังไม่มีโครงการ — กดโหลดข้อมูลทดลองหรือสร้างโครงการใหม่';
+    empty.textContent = 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
     content.appendChild(empty);
   } else {
     content.appendChild(renderProjectsByPriority(sortedProjects));

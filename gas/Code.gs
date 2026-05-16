@@ -63,13 +63,6 @@ function routeAction_(action, data) {
     case 'deleteDepartment':
       DepartmentService.deleteDepartment(data);
       return { success: true };
-    case 'seedMockData': {
-      var seed = MockDataService.seedMockData(!!data.force);
-      var full = SheetService.getPayload();
-      seed.projects = full.projects;
-      seed.departments = full.departments;
-      return seed;
-    }
     case 'sendTestEmail': {
       var emailResult = EmailService.sendTestEmail(data);
       return emailResult;
@@ -88,10 +81,6 @@ function jsonResponse_(obj) {
 
 function setupSpreadsheet() {
   return SheetService.setupSpreadsheet();
-}
-
-function seedMockData() {
-  return MockDataService.seedMockData(false);
 }
 
 function installDailyTrigger() {
