@@ -1,0 +1,25 @@
+name: Sync payload snapshot
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pull from GAS and update payload.json
+        run: node scripts/sync-snapshot.js
+        timeout-minutes: 5
+      - name: Commit if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/data/payload.json
+          git diff --staged --quiet || git commit -m "chore: sync payload snapshot"
+          git push

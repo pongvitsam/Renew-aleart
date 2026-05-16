@@ -2,19 +2,34 @@
 const DataCache = {
   KEY: 'renew_payload_v3',
   TTL: 86400000,
+  STALE_TTL: 604800000,
 
-  get() {
+  _read() {
     try {
       const raw = localStorage.getItem(this.KEY) || sessionStorage.getItem(this.KEY);
       if (!raw) return null;
-      const o = JSON.parse(raw);
-      if (Date.now() - o.t > this.TTL) {
-        localStorage.removeItem(this.KEY);
-        sessionStorage.removeItem(this.KEY);
-        return null;
-      }
-      return o.data;
-    } catch { return null; }
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  },
+
+  get() {
+    const o = this._read();
+    if (!o) return null;
+    if (Date.now() - o.t > this.TTL) return null;
+    return o.data;
+  },
+
+  /** ข้อมูลเก่าเกิน TTL แต่ยังใช้แสดงผลได้ (stale-while-revalidate) */
+  getStale() {
+    const o = this._read();
+    if (!o) return null;
+    if (Date.now() - o.t > this.STALE_TTL) {
+      this.clear();
+      return null;
+    }
+    return { data: o.data, stale: Date.now() - o.t > this.TTL };
   },
 
   set(data) {
@@ -373,12 +388,86 @@ function refreshCurrentView() {
 const Api = {
   TIMEOUT_MS: 40000,
   MAX_RETRIES: 2,
+  LOAD_BUDGET_MS: 2800,
 
-  async fetchWithTimeout(url, options) {
+  getSnapshotUrl() {
+    const base = (CONFIG.BASE_PATH || '/Renew-aleart').replace(/\/$/, '');
+    return (CONFIG.SNAPSHOT_URL || base + '/data/payload.json').split('?')[0];
+  },
+
+  normalizeSnapshot(data) {
+    if (!data || !Array.isArray(data.projects)) return null;
+    return {
+      success: true,
+      projects: data.projects,
+      departments: data.departments || [],
+      _fromSnapshot: true
+    };
+  },
+
+  async fetchJsonWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      clearTimeout(timer);
+      return null;
+    }
+  },
+
+  async consumeSnapshotPrefetch() {
+    if (!window.__SNAPSHOT_PREFETCH__) return null;
+    const pref = window.__SNAPSHOT_PREFETCH__;
+    delete window.__SNAPSHOT_PREFETCH__;
+    try {
+      const data = await pref;
+      return this.normalizeSnapshot(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async fetchSnapshot(timeoutMs) {
+    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
+    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
+    return this.normalizeSnapshot(data);
+  },
+
+  /** โหลดครั้งแรก: snapshot เท่านั้น ไม่รอ GAS (งบเวลา LOAD_BUDGET_MS) */
+  async loadInitialPayload() {
+    const budget = CONFIG.LOAD_BUDGET_MS || this.LOAD_BUDGET_MS;
+
+    if (window.__BOOT_CACHE__) {
+      const boot = window.__BOOT_CACHE__;
+      delete window.__BOOT_CACHE__;
+      return { success: true, ...boot, _fromCache: true };
+    }
+
+    const pref = await this.consumeSnapshotPrefetch();
+    if (pref) {
+      DataCache.set({ projects: pref.projects, departments: pref.departments });
+      return pref;
+    }
+
+    const snap = await this.fetchSnapshot(budget);
+    if (snap) {
+      DataCache.set({ projects: snap.projects, departments: snap.departments });
+      return snap;
+    }
+
+    return { success: true, projects: [], departments: [], _empty: true };
+  },
+
+  async fetchWithTimeout(url, options, timeoutMs) {
+    const ms = timeoutMs || this.TIMEOUT_MS;
     let lastErr;
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), ms);
       try {
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timer);
@@ -388,19 +477,32 @@ const Api = {
         lastErr = err;
         const retryable = err.name === 'AbortError' ||
           (err.message && /failed to fetch|network/i.test(err.message));
-        if (attempt < this.MAX_RETRIES && retryable) {
+        if (attempt < this.MAX_RETRIES && retryable && ms >= 10000) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
         if (err.name === 'AbortError') {
-          throw new Error(
-            'API ช้าเกินไป — ครั้งแรกอาจใช้เวลา 30–60 วินาที ลองรีเฟรช หรือ Deploy Web App เวอร์ชันใหม่ใน Apps Script'
-          );
+          throw new Error('API ช้าเกินไป — กำลังซิงค์ในพื้นหลัง ลองรีเฟรชอีกครั้ง');
         }
         throw err;
       }
     }
     throw lastErr;
+  },
+
+  parseResponseText(text, action) {
+    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
+      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version)');
+    }
+    let json;
+    try { json = JSON.parse(text); } catch {
+      throw new Error('ตอบกลับ API ไม่ถูกต้อง');
+    }
+    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
+    if (action === 'getProjects' && json.projects) {
+      DataCache.set({ projects: json.projects, departments: json.departments });
+    }
+    return json;
   },
 
   async call(action, data = {}, opts = {}) {
@@ -413,28 +515,17 @@ const Api = {
       if (cached) return { success: true, ...cached };
     }
 
+    const timeout = opts.timeoutMs || this.TIMEOUT_MS;
     const response = await this.fetchWithTimeout(apiUrl, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, data })
-    });
+    }, timeout);
 
     const text = await response.text();
-    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
-      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version) แล้วอัปเดต URL ใน config.js');
-    }
-
-    let json;
-    try { json = JSON.parse(text); } catch {
-      throw new Error('ตอบกลับ API ไม่ถูกต้อง — ตรวจ Deploy Web App และ API_URL');
-    }
-    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
-
-    if (action === 'getProjects' && json.projects) {
-      DataCache.set({ projects: json.projects, departments: json.departments });
-    }
-
+    const json = this.parseResponseText(text, action);
+    if (action === 'getProjects') json._fromApi = true;
     return json;
   },
 
@@ -447,31 +538,29 @@ const Api = {
 
   scheduleBackgroundRefresh() {
     clearTimeout(this._refreshTimer);
-    this._refreshTimer = setTimeout(() => this.refreshInBackground(), 400);
+    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
   },
 
-  refreshInBackground() {
-    return this.call('getProjects', {}, { skipCache: true })
+  syncFromApiInBackground() {
+    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
       .then(res => {
         this.applyPayload(res);
         DataCache.set({ projects: res.projects, departments: res.departments });
+        hideSyncIndicator();
         refreshCurrentView();
+        return res;
       })
       .catch(() => {});
   },
 
-  warmApi() {
-    const url = (CONFIG.API_URL || '').trim();
-    if (!url) return;
-    this.fetchWithTimeout(url, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'ping', data: {} })
-    }).catch(() => {});
+  refreshInBackground() {
+    return this.syncFromApiInBackground();
   },
 
   getProjects(opts = {}) {
+    if (opts.background) {
+      return this.syncFromApiInBackground();
+    }
     return this.call('getProjects', {}, opts);
   },
 
@@ -538,7 +627,7 @@ const Api = {
   },
 
   seedMockData(data) {
-    return this.call('seedMockData', data || {}, { skipCache: true }).then(res => {
+    return this.call('seedMockData', data || {}, { skipCache: true, timeoutMs: 120000 }).then(res => {
       if (res.projects) this.applyPayload(res);
       return res;
     });
@@ -580,29 +669,53 @@ function applyServerData(res) {
 function onProjectsLoaded(res) {
   applyServerData(res);
   hideSetupBanner();
-  if (!App.projects.length) {
+  hideSyncIndicator();
+  if (!App.projects.length && !res._syncing) {
     showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
+  } else if (res._empty && App._syncing) {
+    showSetupBanner('กำลังซิงค์ข้อมูลจากเซิร์ฟเวอร์ครั้งแรก — อาจใช้เวลาสักครู่');
   }
   refreshCurrentView();
 }
 
 function onProjectsLoadError(err) {
-  if (!DataCache.get()) {
-    App.projects = [];
-    App.departments = [];
+  hideSyncIndicator();
+  if (!DataCache.get() && !DataCache.getStale()) {
     showSetupBanner(err.message || 'โหลดข้อมูลไม่สำเร็จ');
     refreshCurrentView();
   }
 }
 
-function loadProjects() {
-  const cached = DataCache.get();
+function showSyncIndicator() {
+  let el = document.getElementById('sync-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'sync-indicator';
+    el.className = 'sync-indicator';
+    el.innerHTML = '<i class="fa-solid fa-arrows-rotate fa-spin"></i> กำลังอัปเดต...';
+    const header = document.querySelector('main header');
+    if (header) header.appendChild(el);
+  }
+  el.style.display = '';
+}
+
+function hideSyncIndicator() {
+  const el = document.getElementById('sync-indicator');
+  if (el) el.style.display = 'none';
+}
+
+async function loadProjects() {
+  const fresh = DataCache.get();
+  const stalePack = !fresh && DataCache.getStale();
+  const cached = fresh || stalePack?.data;
+
   if (cached) {
     applyServerData({ success: true, ...cached });
     refreshCurrentView();
     hideSetupBanner();
+    if (stalePack?.stale) showSyncIndicator();
     App._syncing = true;
-    Api.getProjects({ skipCache: true, background: true })
+    Api.syncFromApiInBackground()
       .then(onProjectsLoaded)
       .catch(onProjectsLoadError)
       .finally(() => { App._syncing = false; });
@@ -610,12 +723,23 @@ function loadProjects() {
   }
 
   showDashboardSkeleton();
-  if (typeof Api.warmApi === 'function') Api.warmApi();
   App._syncing = true;
-  Api.getProjects({ skipCache: true })
-    .then(onProjectsLoaded)
-    .catch(onProjectsLoadError)
-    .finally(() => { App._syncing = false; });
+  try {
+    const res = await Api.loadInitialPayload();
+    onProjectsLoaded(res);
+    if (!res._fromApi) {
+      showSyncIndicator();
+      Api.syncFromApiInBackground()
+        .then(onProjectsLoaded)
+        .catch(onProjectsLoadError)
+        .finally(() => { App._syncing = false; });
+    } else {
+      App._syncing = false;
+    }
+  } catch (err) {
+    App._syncing = false;
+    onProjectsLoadError(err);
+  }
 }
 
 function showDashboardSkeleton() {
@@ -631,8 +755,8 @@ function showDashboardSkeleton() {
     grid.appendChild(b);
   }
   const msg = document.createElement('p');
-  msg.className = 'text-center text-slate-500 text-sm py-8';
-  msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...';
+  msg.className = 'skeleton-msg';
+  msg.textContent = 'กำลังโหลด...';
   wrap.append(grid, msg);
   main.replaceChildren(wrap);
 }
@@ -642,7 +766,7 @@ function showSetupBanner(msg) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'setup-banner';
-    el.className = 'bg-amber-50 border-b border-amber-200 text-amber-900 px-4 py-3 text-sm';
+    el.className = 'setup-banner';
     document.body.prepend(el);
   }
   el.innerHTML = '<b>แจ้งเตือน:</b> ' + Utils.escapeHtml(msg);
@@ -660,7 +784,7 @@ function toggleSidebar() {
 
 function demoBadgeHtml(isDemo) {
   if (!isDemo) return '';
-  return '<span class="text-[10px] bg-amber-100 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded ml-1 shrink-0">ทดลอง</span>';
+  return '<span class="demo-badge">ทดลอง</span>';
 }
 
 window.toggleSidebar = toggleSidebar;
@@ -1805,11 +1929,14 @@ Object.assign(window, {
 /* app-main.js */
 function bootstrapApp() {
   document.title = CONFIG.APP_TITLE || CONFIG.APP_NAME || 'Renew Aleart';
-  const cached = DataCache.get();
+  const boot = window.__BOOT_CACHE__;
+  const stale = DataCache.getStale();
+  const cached = boot || DataCache.get() || stale?.data;
   if (cached) {
     Api.applyPayload({ success: true, ...cached });
+    showDashboard();
+    if (boot) delete window.__BOOT_CACHE__;
   }
-  showDashboard();
   loadProjects();
 }
 

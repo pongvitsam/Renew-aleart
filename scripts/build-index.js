@@ -1,6 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+
+const configSrc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'assets', 'js', 'config.js'), 'utf8');
+const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
+const bootInline =
+  '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
+  'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
+  'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
+const ASSET_V = '14';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -84,8 +92,12 @@ const html = [
   '<!DOCTYPE html><html lang="th"><head>',
   '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
   '<title>Renew Aleart</title>',
+  bootInline,
   '<link rel="preconnect" href="https://script.google.com" crossorigin>',
+  '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<link rel="dns-prefetch" href="https://script.google.com">',
+  '<link rel="dns-prefetch" href="https://script.googleusercontent.com">',
+  '<link rel="preload" href="/Renew-aleart/data/payload.json" as="fetch" crossorigin>',
   '<link rel="stylesheet" href="/Renew-aleart/assets/css/app.css">',
   '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media=\'all\'">',
   '<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>',
@@ -113,8 +125,8 @@ const html = [
   timelineModal,
   testModal,
   departmentModal,
-  '<script src="/Renew-aleart/assets/js/config.js?v=12"></script>',
-  '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=12"></script>',
+  '<script src="/Renew-aleart/assets/js/config.js?v=' + ASSET_V + '"></script>',
+  '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=' + ASSET_V + '"></script>',
   '</body></html>'
 ].join('');
 

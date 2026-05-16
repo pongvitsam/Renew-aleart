@@ -27,7 +27,9 @@ function doPost(e) {
 function routeAction_(action, data) {
   switch (action) {
     case 'ping':
-      return { success: true, message: 'Renew Aleart API', version: '1.3.1' };
+      return { success: true, message: 'Renew Aleart API', version: '1.4.0' };
+    case 'exportSnapshot':
+      return SnapshotService.exportSnapshotNow();
     case 'getProjects': {
       var p = SheetService.getPayload();
       return { success: true, projects: p.projects, departments: p.departments };

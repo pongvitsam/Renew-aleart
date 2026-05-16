@@ -131,6 +131,18 @@ var SheetService = (function () {
     return historyByLicense;
   }
 
+  function mapLicenseRowLite_(l) {
+    return {
+      id: Number(l.id),
+      name: l.name,
+      issueDate: formatDateValue_(l.issueDate),
+      expiryDate: formatDateValue_(l.expiryDate),
+      alertMonths: Number(l.alertMonths) || 3,
+      driveUrl: l.driveUrl || '',
+      status: l.status || '-'
+    };
+  }
+
   function mapLicenseRow_(l, historyByLicense, includeHistory) {
     var cycles = parseJson_(l.renewalCycles, []);
     cycles.sort(function (a, b) { return (a.round || 0) - (b.round || 0); });
@@ -148,12 +160,16 @@ var SheetService = (function () {
     };
   }
 
-  function buildProjectsFromRows_(projectRows, licenseRows, includeHistory, historyByLicense) {
+  function buildProjectsFromRows_(projectRows, licenseRows, includeHistory, historyByLicense, lite) {
     var licensesByProject = {};
     licenseRows.forEach(function (l) {
       var pid = String(l.projectId);
       if (!licensesByProject[pid]) licensesByProject[pid] = [];
-      licensesByProject[pid].push(mapLicenseRow_(l, historyByLicense, includeHistory));
+      if (lite) {
+        licensesByProject[pid].push(mapLicenseRowLite_(l));
+      } else {
+        licensesByProject[pid].push(mapLicenseRow_(l, historyByLicense, includeHistory));
+      }
     });
 
     return projectRows.map(function (p) {
@@ -201,7 +217,7 @@ var SheetService = (function () {
     var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
     var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
     var payload = {
-      projects: buildProjectsFromRows_(projectRows, licenseRows, false, {}),
+      projects: buildProjectsFromRows_(projectRows, licenseRows, false, {}, true),
       departments: DepartmentService.getDepartmentsFromProjectRows_(projectRows)
     };
     PayloadCache.set(payload);
@@ -210,6 +226,9 @@ var SheetService = (function () {
 
   function invalidateCache_() {
     PayloadCache.clear();
+    if (typeof SnapshotService !== 'undefined') {
+      SnapshotService.scheduleUpdate_();
+    }
   }
 
   function formatDateValue_(val) {

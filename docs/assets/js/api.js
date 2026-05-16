@@ -1,12 +1,86 @@
 const Api = {
   TIMEOUT_MS: 40000,
   MAX_RETRIES: 2,
+  LOAD_BUDGET_MS: 2800,
 
-  async fetchWithTimeout(url, options) {
+  getSnapshotUrl() {
+    const base = (CONFIG.BASE_PATH || '/Renew-aleart').replace(/\/$/, '');
+    return (CONFIG.SNAPSHOT_URL || base + '/data/payload.json').split('?')[0];
+  },
+
+  normalizeSnapshot(data) {
+    if (!data || !Array.isArray(data.projects)) return null;
+    return {
+      success: true,
+      projects: data.projects,
+      departments: data.departments || [],
+      _fromSnapshot: true
+    };
+  },
+
+  async fetchJsonWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      clearTimeout(timer);
+      return null;
+    }
+  },
+
+  async consumeSnapshotPrefetch() {
+    if (!window.__SNAPSHOT_PREFETCH__) return null;
+    const pref = window.__SNAPSHOT_PREFETCH__;
+    delete window.__SNAPSHOT_PREFETCH__;
+    try {
+      const data = await pref;
+      return this.normalizeSnapshot(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async fetchSnapshot(timeoutMs) {
+    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
+    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
+    return this.normalizeSnapshot(data);
+  },
+
+  /** โหลดครั้งแรก: snapshot เท่านั้น ไม่รอ GAS (งบเวลา LOAD_BUDGET_MS) */
+  async loadInitialPayload() {
+    const budget = CONFIG.LOAD_BUDGET_MS || this.LOAD_BUDGET_MS;
+
+    if (window.__BOOT_CACHE__) {
+      const boot = window.__BOOT_CACHE__;
+      delete window.__BOOT_CACHE__;
+      return { success: true, ...boot, _fromCache: true };
+    }
+
+    const pref = await this.consumeSnapshotPrefetch();
+    if (pref) {
+      DataCache.set({ projects: pref.projects, departments: pref.departments });
+      return pref;
+    }
+
+    const snap = await this.fetchSnapshot(budget);
+    if (snap) {
+      DataCache.set({ projects: snap.projects, departments: snap.departments });
+      return snap;
+    }
+
+    return { success: true, projects: [], departments: [], _empty: true };
+  },
+
+  async fetchWithTimeout(url, options, timeoutMs) {
+    const ms = timeoutMs || this.TIMEOUT_MS;
     let lastErr;
     for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), ms);
       try {
         const res = await fetch(url, { ...options, signal: controller.signal });
         clearTimeout(timer);
@@ -16,19 +90,32 @@ const Api = {
         lastErr = err;
         const retryable = err.name === 'AbortError' ||
           (err.message && /failed to fetch|network/i.test(err.message));
-        if (attempt < this.MAX_RETRIES && retryable) {
+        if (attempt < this.MAX_RETRIES && retryable && ms >= 10000) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
         if (err.name === 'AbortError') {
-          throw new Error(
-            'API ช้าเกินไป — ครั้งแรกอาจใช้เวลา 30–60 วินาที ลองรีเฟรช หรือ Deploy Web App เวอร์ชันใหม่ใน Apps Script'
-          );
+          throw new Error('API ช้าเกินไป — กำลังซิงค์ในพื้นหลัง ลองรีเฟรชอีกครั้ง');
         }
         throw err;
       }
     }
     throw lastErr;
+  },
+
+  parseResponseText(text, action) {
+    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
+      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version)');
+    }
+    let json;
+    try { json = JSON.parse(text); } catch {
+      throw new Error('ตอบกลับ API ไม่ถูกต้อง');
+    }
+    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
+    if (action === 'getProjects' && json.projects) {
+      DataCache.set({ projects: json.projects, departments: json.departments });
+    }
+    return json;
   },
 
   async call(action, data = {}, opts = {}) {
@@ -41,28 +128,17 @@ const Api = {
       if (cached) return { success: true, ...cached };
     }
 
+    const timeout = opts.timeoutMs || this.TIMEOUT_MS;
     const response = await this.fetchWithTimeout(apiUrl, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, data })
-    });
+    }, timeout);
 
     const text = await response.text();
-    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
-      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version) แล้วอัปเดต URL ใน config.js');
-    }
-
-    let json;
-    try { json = JSON.parse(text); } catch {
-      throw new Error('ตอบกลับ API ไม่ถูกต้อง — ตรวจ Deploy Web App และ API_URL');
-    }
-    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
-
-    if (action === 'getProjects' && json.projects) {
-      DataCache.set({ projects: json.projects, departments: json.departments });
-    }
-
+    const json = this.parseResponseText(text, action);
+    if (action === 'getProjects') json._fromApi = true;
     return json;
   },
 
@@ -75,31 +151,29 @@ const Api = {
 
   scheduleBackgroundRefresh() {
     clearTimeout(this._refreshTimer);
-    this._refreshTimer = setTimeout(() => this.refreshInBackground(), 400);
+    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
   },
 
-  refreshInBackground() {
-    return this.call('getProjects', {}, { skipCache: true })
+  syncFromApiInBackground() {
+    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
       .then(res => {
         this.applyPayload(res);
         DataCache.set({ projects: res.projects, departments: res.departments });
+        hideSyncIndicator();
         refreshCurrentView();
+        return res;
       })
       .catch(() => {});
   },
 
-  warmApi() {
-    const url = (CONFIG.API_URL || '').trim();
-    if (!url) return;
-    this.fetchWithTimeout(url, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action: 'ping', data: {} })
-    }).catch(() => {});
+  refreshInBackground() {
+    return this.syncFromApiInBackground();
   },
 
   getProjects(opts = {}) {
+    if (opts.background) {
+      return this.syncFromApiInBackground();
+    }
     return this.call('getProjects', {}, opts);
   },
 
@@ -166,7 +240,7 @@ const Api = {
   },
 
   seedMockData(data) {
-    return this.call('seedMockData', data || {}, { skipCache: true }).then(res => {
+    return this.call('seedMockData', data || {}, { skipCache: true, timeoutMs: 120000 }).then(res => {
       if (res.projects) this.applyPayload(res);
       return res;
     });
