@@ -25,43 +25,41 @@ function doPost(e) {
 }
 
 function routeAction_(action, data) {
-  var payload = function () {
-    var p = SheetService.getPayload();
-    return { success: true, projects: p.projects, departments: p.departments };
-  };
-
   switch (action) {
     case 'ping':
-      return { success: true, message: 'Renew Aleart API', version: '1.1.0' };
-    case 'getProjects':
-      return payload();
-    case 'saveProject':
-      SheetService.saveProject(data);
-      return payload();
-    case 'saveLicense':
-      SheetService.saveLicense(data);
-      return payload();
+      return { success: true, message: 'Renew Aleart API', version: '1.2.0' };
+    case 'getProjects': {
+      var p = SheetService.getPayload();
+      return { success: true, projects: p.projects, departments: p.departments };
+    }
+    case 'saveProject': {
+      var saved = SheetService.saveProject(data);
+      return { success: true, id: saved.id };
+    }
+    case 'saveLicense': {
+      var lic = SheetService.saveLicense(data);
+      return { success: true, id: lic.id, projectId: data.projectId };
+    }
     case 'saveTimelineUpdate':
       SheetService.saveTimelineUpdate(data);
-      return payload();
+      return { success: true, licenseId: data.licenseId };
     case 'saveDepartment':
       DepartmentService.saveDepartment(data);
-      return payload();
+      return { success: true };
     case 'deleteDepartment':
       DepartmentService.deleteDepartment(data);
-      return payload();
-    case 'seedMockData':
+      return { success: true };
+    case 'seedMockData': {
       var seed = MockDataService.seedMockData(!!data.force);
-      var p = SheetService.getPayload();
-      seed.projects = p.projects;
-      seed.departments = p.departments;
-      return seed;
-    case 'sendTestEmail':
-      var emailResult = EmailService.sendTestEmail(data);
       var full = SheetService.getPayload();
-      emailResult.projects = full.projects;
-      emailResult.departments = full.departments;
+      seed.projects = full.projects;
+      seed.departments = full.departments;
+      return seed;
+    }
+    case 'sendTestEmail': {
+      var emailResult = EmailService.sendTestEmail(data);
       return emailResult;
+    }
     case 'setupSpreadsheet':
       return SheetService.setupSpreadsheet();
     default:

@@ -16,7 +16,7 @@ var EmailService = (function () {
       '<p><b>ใบอนุญาต:</b> ' + escapeHtml_(license.name) + '</p>',
       '<p><b>วันหมดอายุ:</b> ' + expStr + '</p>',
       '<p><b>คงเหลือ:</b> <span style="color:#e11d48;font-weight:bold;">' + remainText + '</span></p>',
-      license.driveUrl ? '<p><a href="' + license.driveUrl + '">เปิดเอกสาร Google Drive</a></p>' : '',
+      project.driveUrl ? '<p><a href="' + project.driveUrl + '">เปิดโฟลเดอร์ Google Drive โครงการ</a></p>' : '',
       '<hr><p style="font-size:12px;color:#64748b;">ส่งจากระบบ Renew Aleart — © Pongvit Y.</p>',
       '</div>'
     ].join('');

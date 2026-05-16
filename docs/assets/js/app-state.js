@@ -13,11 +13,16 @@ function applyServerData(res) {
 }
 
 async function loadProjects() {
-  const hadCache = !!DataCache.get();
-  if (!hadCache) Utils.setLoading(true);
+  const cached = DataCache.get();
+  if (cached) {
+    applyServerData({ success: true, ...cached });
+    if (App.currentView === 'dashboard') showDashboard();
+  } else {
+    Utils.setLoading(true);
+  }
   const safety = setTimeout(() => Utils.setLoading(false), Api.TIMEOUT_MS + 2000);
   try {
-    const res = await Api.getProjects();
+    const res = await Api.getProjects({ skipCache: true });
     applyServerData(res);
     hideSetupBanner();
     if (!App.projects.length) {

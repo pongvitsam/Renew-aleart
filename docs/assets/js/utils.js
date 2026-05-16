@@ -164,6 +164,40 @@
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
+  },
+
+  isDriveUrl(url) {
+    const u = String(url || '').trim();
+    return /^https?:\/\//i.test(u) && /drive\.google|docs\.google/i.test(u);
+  },
+
+  getProjectDriveUrl(project) {
+    return this.isDriveUrl(project?.driveUrl) ? String(project.driveUrl).trim() : '';
+  },
+
+  buildDriveOpenControl(project, opts) {
+    opts = opts || {};
+    const url = this.getProjectDriveUrl(project);
+    const onEdit = opts.onEdit;
+
+    if (url) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.className = opts.className || 'btn-primary text-sm px-4 py-2 inline-flex items-center gap-2 shrink-0';
+      a.innerHTML = '<i class="fa-brands fa-google-drive"></i> ' + (opts.label || 'เปิดโฟลเดอร์ Drive');
+      return a;
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.disabled = true;
+    btn.className = opts.disabledClassName ||
+      'text-sm px-4 py-2 rounded-xl border border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed inline-flex items-center gap-2 shrink-0';
+    btn.title = 'ต้องวาง URL Google Drive ของโครงการก่อนจึงจะเปิดได้';
+    btn.innerHTML = '<i class="fa-brands fa-google-drive"></i> ' + (opts.disabledLabel || 'เปิด Drive (ยังไม่มีลิงก์)');
+    return btn;
   }
 };
 

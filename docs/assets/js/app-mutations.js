@@ -1,0 +1,81 @@
+const Mutations = {
+  persist() {
+    DataCache.set({ projects: App.projects, departments: App.departments });
+    if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
+  },
+
+  findProject(id) {
+    return App.projects.find(p => Number(p.id) === Number(id));
+  },
+
+  findLicense(projectId, licenseId) {
+    const p = this.findProject(projectId);
+    return p?.licenses?.find(l => Number(l.id) === Number(licenseId));
+  },
+
+  upsertProjectLocal(data, serverId) {
+    const id = Number(serverId || data.id || Date.now());
+    const existing = this.findProject(id);
+    const project = {
+      id,
+      name: data.name,
+      department: data.department,
+      emails: data.emails || [],
+      driveUrl: (data.driveUrl || '').trim(),
+      isDemo: existing?.isDemo || false,
+      licenses: existing?.licenses || []
+    };
+    const idx = App.projects.findIndex(p => Number(p.id) === id);
+    if (idx >= 0) App.projects[idx] = project;
+    else App.projects.push(project);
+    this.persist();
+    return id;
+  },
+
+  addLicenseLocal(projectId, data, serverId) {
+    const p = this.findProject(projectId);
+    if (!p) return null;
+    const id = Number(serverId || Date.now());
+    const license = {
+      id,
+      name: data.name,
+      issueDate: data.issueDate,
+      expiryDate: data.expiryDate,
+      alertMonths: data.alertMonths || 3,
+      driveUrl: '',
+      status: data.status || 'รอเริ่มดำเนินการ',
+      steps: data.steps || [],
+      history: []
+    };
+    if (!p.licenses) p.licenses = [];
+    p.licenses.push(license);
+    this.persist();
+    return id;
+  },
+
+  timelineUpdateLocal(licenseId, step, note) {
+    let found = null;
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) !== Number(licenseId)) return;
+        found = { project: p, license: l };
+        if (step) l.status = step;
+        if (!l.history) l.history = [];
+        l.history.push({
+          id: Date.now(),
+          date: new Date().toISOString().slice(0, 10),
+          action: step || 'บันทึกทั่วไป',
+          note: note || ''
+        });
+      });
+    });
+    if (found) this.persist();
+    return found;
+  }
+};
+
+function refreshCurrentView() {
+  renderSidebar(true);
+  if (App.currentView === 'dashboard') showDashboard();
+  else if (App.currentProjectId) renderProjectView(App.currentProjectId);
+}

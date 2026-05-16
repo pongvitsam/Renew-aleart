@@ -1,5 +1,6 @@
 const Api = {
-  TIMEOUT_MS: 35000,
+  TIMEOUT_MS: 25000,
+  _refreshTimer: null,
 
   async fetchWithTimeout(url, options) {
     const controller = new AbortController();
@@ -44,8 +45,6 @@ const Api = {
 
     if (action === 'getProjects' && json.projects) {
       DataCache.set({ projects: json.projects, departments: json.departments });
-    } else if (action !== 'getProjects' && action !== 'ping') {
-      DataCache.clear();
     }
 
     return json;
@@ -58,12 +57,67 @@ const Api = {
     return res;
   },
 
-  getProjects() { return this.call('getProjects'); },
-  saveProject(data) { DataCache.clear(); return this.call('saveProject', data, { skipCache: true }); },
-  saveLicense(data) { DataCache.clear(); return this.call('saveLicense', data, { skipCache: true }); },
-  saveTimelineUpdate(data) { DataCache.clear(); return this.call('saveTimelineUpdate', data, { skipCache: true }); },
-  sendTestEmail(data) { DataCache.clear(); return this.call('sendTestEmail', data, { skipCache: true }); },
-  saveDepartment(data) { DataCache.clear(); return this.call('saveDepartment', data, { skipCache: true }); },
-  deleteDepartment(data) { DataCache.clear(); return this.call('deleteDepartment', data, { skipCache: true }); },
-  seedMockData(data) { DataCache.clear(); return this.call('seedMockData', data || {}, { skipCache: true }); }
+  scheduleBackgroundRefresh() {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.refreshInBackground(), 400);
+  },
+
+  refreshInBackground() {
+    return this.call('getProjects', {}, { skipCache: true })
+      .then(res => {
+        this.applyPayload(res);
+        DataCache.set({ projects: res.projects, departments: res.departments });
+        refreshCurrentView();
+      })
+      .catch(() => {});
+  },
+
+  getProjects(opts) {
+    return this.call('getProjects', {}, opts);
+  },
+
+  async saveProject(data) {
+    const res = await this.call('saveProject', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveLicense(data) {
+    const res = await this.call('saveLicense', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveTimelineUpdate(data) {
+    const res = await this.call('saveTimelineUpdate', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async sendTestEmail(data) {
+    const res = await this.call('sendTestEmail', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  saveDepartment(data) {
+    return this.call('saveDepartment', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
+  },
+
+  deleteDepartment(data) {
+    return this.call('deleteDepartment', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
+  },
+
+  seedMockData(data) {
+    return this.call('seedMockData', data || {}, { skipCache: true }).then(res => {
+      if (res.projects) this.applyPayload(res);
+      return res;
+    });
+  }
 };

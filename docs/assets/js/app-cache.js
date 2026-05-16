@@ -1,6 +1,6 @@
 const DataCache = {
   KEY: 'renew_payload_v2',
-  TTL: 120000,
+  TTL: 300000,
 
   get() {
     try {

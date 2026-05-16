@@ -71,19 +71,17 @@ async function saveProject() {
   const driveUrl = (document.getElementById('project-drive-url') || {}).value?.trim() || '';
   if (!name || !department) return showToast('กรุณากรอกชื่อและแผนก', 'error');
 
-  Utils.setLoading(true);
+  const payload = { id: id || undefined, name, department, emails: App.tempEmails, driveUrl };
+  const localId = Mutations.upsertProjectLocal(payload);
+  closeModal('projectModal');
+  showToast('บันทึกโครงการแล้ว');
+  refreshCurrentView();
+
   try {
-    const res = await Api.saveProject({ id: id || undefined, name, department, emails: App.tempEmails, driveUrl });
-    applyServerData(res);
-    closeModal('projectModal');
-    showToast('บันทึกโครงการสำเร็จ');
-    renderSidebar();
-    if (App.currentView === 'dashboard') showDashboard();
-    else renderProjectView(id ? Number(id) : App.projects[App.projects.length - 1]?.id);
+    await Api.saveProject(payload);
   } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
   }
 }
 
@@ -92,7 +90,6 @@ function openLicenseModal() {
   document.getElementById('license-issue-date').value = '';
   document.getElementById('license-expiry-date').value = '';
   document.getElementById('license-alert-months').value = '3';
-  document.getElementById('license-drive-url').value = '';
   document.getElementById('license-steps').value =
     '1. แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง\n2. ขอเอกสารสนับสนุนจากลูกค้า\n3. ได้รับเอกสารครบถ้วน\n4. ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ\n5. แจ้งผลให้ลูกค้าทราบ\n6. เสร็จสิ้นสมบูรณ์';
   openModal('licenseModal');
@@ -103,27 +100,26 @@ async function saveLicense() {
   const issueDate = document.getElementById('license-issue-date').value;
   const expiryDate = document.getElementById('license-expiry-date').value;
   const alertMonths = parseInt(document.getElementById('license-alert-months').value, 10) || 3;
-  const driveUrl = document.getElementById('license-drive-url').value;
   const stepsTxt = document.getElementById('license-steps').value;
   if (!name || !issueDate || !expiryDate) return showToast('กรุณากรอกข้อมูลสำคัญให้ครบ', 'error');
 
   const steps = stepsTxt.split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(Boolean);
+  const payload = {
+    projectId: App.currentProjectId,
+    name, issueDate, expiryDate, alertMonths, driveUrl: '', steps,
+    status: 'รอเริ่มดำเนินการ'
+  };
 
-  Utils.setLoading(true);
+  Mutations.addLicenseLocal(App.currentProjectId, payload);
+  closeModal('licenseModal');
+  showToast('บันทึกใบอนุญาตแล้ว');
+  refreshCurrentView();
+
   try {
-    const res = await Api.saveLicense({
-      projectId: App.currentProjectId,
-      name, issueDate, expiryDate, alertMonths, driveUrl, steps
-    });
-    applyServerData(res);
-    closeModal('licenseModal');
-    showToast('บันทึกใบอนุญาตสำเร็จ');
-    renderProjectView(App.currentProjectId);
-    renderSidebar();
+    await Api.saveLicense(payload);
   } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
   }
 }
 
@@ -133,18 +129,17 @@ async function saveTimelineUpdate() {
   const note = document.getElementById('update-note').value.trim();
   if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
 
-  Utils.setLoading(true);
+  Mutations.timelineUpdateLocal(licenseId, step, note);
+  document.getElementById('update-note').value = '';
+  renderTimeline(App.currentProjectId, Number(licenseId));
+  renderProjectView(App.currentProjectId);
+  showToast('บันทึกขั้นตอนแล้ว');
+
   try {
-    const res = await Api.saveTimelineUpdate({ licenseId, step, note });
-    applyServerData(res);
-    showToast('บันทึกประวัติสำเร็จ');
-    document.getElementById('update-note').value = '';
-    renderTimeline(App.currentProjectId, Number(licenseId));
-    renderProjectView(App.currentProjectId);
+    await Api.saveTimelineUpdate({ licenseId, step, note });
   } catch (err) {
-    showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
   }
 }
 
@@ -186,15 +181,14 @@ async function sendTestEmail() {
 
   Utils.setLoading(true);
   try {
-    const res = await Api.sendTestEmail({
+    await Api.sendTestEmail({
       projectId: App.activeTestProjectId,
       licenseId: select.value,
       saveLog
     });
-    applyServerData(res);
     closeModal('testEmailModal');
     showToast('ส่งอีเมลทดสอบสำเร็จ');
-    if (App.currentView === 'project') renderProjectView(App.activeTestProjectId);
+    refreshCurrentView();
   } catch (err) {
     showToast(err.message, 'error');
   } finally {

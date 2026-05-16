@@ -59,34 +59,28 @@ async function addDepartment() {
   const name = input.value.trim();
   if (!name) return showToast('กรุณาระบุชื่อแผนก', 'error');
 
-  Utils.setLoading(true);
   try {
-    const res = await Api.saveDepartment({ name });
-    applyServerData(res);
+    await Api.saveDepartment({ name });
     input.value = '';
+    showToast('เพิ่มแผนกแล้ว');
+    await Api.refreshInBackground();
     renderDepartmentList();
     populateDepartmentSelect();
-    showToast('เพิ่มแผนกสำเร็จ');
   } catch (err) {
     showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
   }
 }
 
 async function deleteDepartment(id) {
   if (!confirm('ลบแผนกนี้?')) return;
-  Utils.setLoading(true);
   try {
-    const res = await Api.deleteDepartment({ id });
-    applyServerData(res);
+    await Api.deleteDepartment({ id });
+    showToast('ลบแผนกแล้ว');
+    await Api.refreshInBackground();
     renderDepartmentList();
     populateDepartmentSelect();
-    showToast('ลบแผนกสำเร็จ');
   } catch (err) {
     showToast(err.message, 'error');
-  } finally {
-    Utils.setLoading(false);
   }
 }
 

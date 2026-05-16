@@ -11,6 +11,8 @@ function renderProjectView(projectId) {
   if (!project) return;
 
   const pst = Utils.getProjectStatus(project);
+  const hasDrive = !!Utils.getProjectDriveUrl(project);
+
   document.getElementById('page-title').innerHTML =
     '<span class="flex items-center gap-3 w-full truncate"><i class="fa-regular fa-building text-indigo-500"></i>' +
     Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) +
@@ -22,50 +24,56 @@ function renderProjectView(projectId) {
 
   const driveSection = document.createElement('section');
   driveSection.className = 'drive-box mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
-  if (project.driveUrl) {
-    const info = document.createElement('div');
+
+  const info = document.createElement('div');
+  info.className = 'flex-1 min-w-0';
+  if (hasDrive) {
     info.innerHTML =
       '<p class="text-xs font-bold text-blue-800 uppercase mb-1"><i class="fa-brands fa-google-drive mr-1"></i> Google Drive โครงการ</p>' +
-      '<p class="text-sm text-slate-600 truncate max-w-md">' + Utils.escapeHtml(project.driveUrl) + '</p>';
-    const open = document.createElement('a');
-    open.href = project.driveUrl;
-    open.target = '_blank';
-    open.rel = 'noopener';
-    open.className = 'btn-primary text-sm px-4 py-2 inline-flex items-center gap-2 shrink-0';
-    open.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดโฟลเดอร์';
-    driveSection.append(info, open);
+      '<p class="text-sm text-slate-600 truncate">' + Utils.escapeHtml(project.driveUrl) + '</p>' +
+      '<p class="text-[11px] text-slate-500 mt-1">โฟลเดอร์นี้ใช้เปิดเอกสารของทุกใบอนุญาตในโครงการนี้</p>';
   } else {
-    driveSection.innerHTML =
-      '<div><p class="text-sm font-bold text-slate-700"><i class="fa-brands fa-google-drive mr-2 text-blue-500"></i>ยังไม่มีลิงก์ Google Drive</p>' +
-      '<p class="text-xs text-slate-500 mt-1">กดแก้ไขโครงการเพื่อวาง URL โฟลเดอร์ Drive</p></div>';
+    info.innerHTML =
+      '<p class="text-sm font-bold text-slate-700"><i class="fa-brands fa-google-drive mr-2 text-blue-500"></i>ยังไม่มีลิงก์ Google Drive</p>' +
+      '<p class="text-xs text-slate-500 mt-1">โครงการละ 1 ลิงก์ — วาง URL ก่อนจึงจะกดเปิดไฟล์ได้</p>';
+  }
+
+  const driveActions = document.createElement('div');
+  driveActions.className = 'flex flex-wrap gap-2 shrink-0';
+  driveActions.appendChild(Utils.buildDriveOpenControl(project, {
+    label: 'เปิดโฟลเดอร์ Drive',
+    disabledLabel: 'เปิด Drive (ต้องใส่ลิงก์ก่อน)'
+  }));
+  if (!hasDrive) {
     const edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'text-sm font-bold text-indigo-600 border border-indigo-200 bg-white px-4 py-2 rounded-xl';
-    edit.textContent = '+ เพิ่มลิงก์ Drive';
+    edit.textContent = 'ใส่ลิงก์ Drive';
     edit.onclick = () => openProjectModal(project.id);
-    driveSection.appendChild(edit);
+    driveActions.appendChild(edit);
   }
+  driveSection.append(info, driveActions);
   content.appendChild(driveSection);
 
   const header = document.createElement('section');
   header.className = 'bg-white p-5 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 justify-between';
+
   const emailWrap = document.createElement('div');
   emailWrap.innerHTML = '<p class="text-xs font-bold text-slate-400 uppercase mb-2">อีเมลรับแจ้งเตือน (ไม่บังคับ)</p>';
   const emailTags = document.createElement('p');
   emailTags.className = 'flex flex-wrap gap-2 text-[11px]';
-  const emails = project.emails || [];
-  if (!emails.length) {
-    const none = document.createElement('span');
-    none.className = 'text-xs text-slate-400 italic';
-    none.textContent = 'ยังไม่ได้ตั้งอีเมลแจ้งเตือน';
-    emailTags.append(none);
-  }
-  emails.forEach(e => {
+  (project.emails || []).forEach(e => {
     const s = document.createElement('span');
     s.className = 'bg-slate-100 px-2 py-1 rounded border';
     s.textContent = e;
     emailTags.append(s);
   });
+  if (!(project.emails || []).length) {
+    const none = document.createElement('span');
+    none.className = 'text-xs text-slate-400 italic';
+    none.textContent = 'ยังไม่ได้ตั้งอีเมลแจ้งเตือน';
+    emailTags.append(none);
+  }
   emailWrap.append(emailTags);
   const testBtn = document.createElement('button');
   testBtn.type = 'button';
@@ -80,12 +88,12 @@ function renderProjectView(projectId) {
   addBtn.textContent = '+ เพิ่มใบอนุญาต';
   addBtn.onclick = () => openLicenseModal();
   header.append(emailWrap, addBtn);
-  content.append(header);
+  content.appendChild(header);
 
   const title = document.createElement('h3');
   title.className = 'text-xl font-bold mb-4 flex items-center gap-2';
   title.innerHTML = '<i class="fa-solid fa-file-contract text-emerald-500"></i> ใบอนุญาตในโครงการ';
-  content.append(title);
+  content.appendChild(title);
 
   const grid = document.createElement('div');
   grid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-5';
@@ -98,7 +106,7 @@ function renderProjectView(projectId) {
   } else {
     licenses.forEach(l => grid.append(buildLicenseCard(project, l)));
   }
-  content.append(grid);
+  content.appendChild(grid);
 }
 
 function buildLicenseCard(project, l) {
@@ -119,20 +127,16 @@ function buildLicenseCard(project, l) {
   mid.innerHTML =
     '<div><p class="text-[10px] text-slate-400 uppercase">ออก</p><p class="font-semibold">' + Utils.formatDate(l.issueDate) + '</p></div>' +
     '<div><p class="text-[10px] text-slate-400 uppercase">หมดอายุ</p><p class="font-semibold">' + Utils.formatDate(l.expiryDate) + '</p></div>';
-  mid.innerHTML = mid.innerHTML.replace(/<\/?motion[^>]*>/gi, m => m.startsWith('</') ? '</div>' : '<div>');
   card.append(mid);
 
   const actions = document.createElement('footer');
   actions.className = 'p-4 border-t flex gap-2 flex-wrap';
-  if (l.driveUrl) {
-    const a = document.createElement('a');
-    a.href = l.driveUrl;
-    a.target = '_blank';
-    a.rel = 'noopener';
-    a.className = 'text-xs bg-blue-50 text-blue-600 px-3 py-2 rounded-lg border font-bold inline-flex items-center gap-1';
-    a.innerHTML = '<i class="fa-brands fa-google-drive"></i> Drive';
-    actions.append(a);
-  }
+  actions.appendChild(Utils.buildDriveOpenControl(project, {
+    className: 'text-xs bg-blue-50 text-blue-600 px-3 py-2 rounded-lg border font-bold inline-flex items-center gap-1',
+    disabledClassName: 'text-xs bg-slate-100 text-slate-400 px-3 py-2 rounded-lg border font-bold inline-flex items-center gap-1 cursor-not-allowed',
+    label: 'เปิดไฟล์ Drive',
+    disabledLabel: 'Drive (ใส่ลิงก์โครงการก่อน)'
+  }));
   const timelineBtn = document.createElement('button');
   timelineBtn.type = 'button';
   timelineBtn.className = 'flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm';

@@ -253,3 +253,8 @@ body {
   transition: filter 0.15s, transform 0.15s;
 }
 .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+button:disabled,
+a.btn-primary[aria-disabled="true"] {
+  pointer-events: none;
+}

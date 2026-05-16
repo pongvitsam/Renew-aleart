@@ -182,10 +182,11 @@ function buildProjectDashboardCard(project, rank) {
     '<span class="text-rose-600"><i class="fa-solid fa-circle text-[6px]"></i> ' + st.counts.expired + '</span>';
 
   const drive = document.createElement('p');
-  drive.className = project.driveUrl ? 'text-[11px] text-blue-600 mt-2 truncate' : 'text-[11px] text-slate-400 mt-2';
-  drive.innerHTML = project.driveUrl
-    ? '<i class="fa-brands fa-google-drive mr-1"></i>มีโฟลเดอร์ Drive'
-    : '<i class="fa-brands fa-google-drive mr-1"></i>ยังไม่มีลิงก์ Drive';
+  const hasDrive = !!Utils.getProjectDriveUrl(project);
+  drive.className = hasDrive ? 'text-[11px] text-blue-600 mt-2 truncate' : 'text-[11px] text-slate-400 mt-2';
+  drive.innerHTML = hasDrive
+    ? '<i class="fa-brands fa-google-drive mr-1"></i>มีลิงก์ Drive — เปิดได้จากหน้าโครงการ'
+    : '<i class="fa-brands fa-google-drive mr-1"></i>ยังไม่มีลิงก์ — ต้องใส่ URL ก่อนเปิดไฟล์';
 
   card.append(head, dept, counts, drive);
 

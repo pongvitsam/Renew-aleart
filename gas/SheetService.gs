@@ -60,8 +60,11 @@ var SheetService = (function () {
   function readTable_(sheetName) {
     var ss = openSs_();
     var sheet = ss.getSheetByName(sheetName);
-    if (!sheet || sheet.getLastRow() < 2) return [];
-    var data = sheet.getDataRange().getValues();
+    if (!sheet) return [];
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 2 || lastCol < 1) return [];
+    var data = sheet.getRange(1, 1, lastRow, lastCol).getValues();
     var headers = data[0];
     var rows = [];
     for (var i = 1; i < data.length; i++) {
@@ -168,10 +171,20 @@ var SheetService = (function () {
     return s;
   }
 
+  function findDataRow_(sheet, id) {
+    if (!id) return -1;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return -1;
+    var ids = sheet.getRange(2, 1, lastRow, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) return i + 2;
+    }
+    return -1;
+  }
+
   function upsertRow_(sheetName, id, rowObj, headers) {
     var ss = ensureInitialized();
     var sheet = ss.getSheetByName(sheetName);
-    var data = sheet.getDataRange().getValues();
     var now = new Date().toISOString();
     var rowValues = headers.map(function (h) {
       if (h === 'updatedAt') return now;
@@ -179,14 +192,16 @@ var SheetService = (function () {
       return rowObj[h] !== undefined ? rowObj[h] : '';
     });
 
-    if (id) {
-      for (var i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(id)) {
-          if (rowObj.createdAt) rowValues[headers.indexOf('createdAt')] = data[i][headers.indexOf('createdAt')];
-          sheet.getRange(i + 1, 1, 1, rowValues.length).setValues([rowValues]);
-          return Number(id);
+    var rowIdx = findDataRow_(sheet, id);
+    if (rowIdx > 0) {
+      if (rowObj.createdAt) {
+        var createdCol = headers.indexOf('createdAt') + 1;
+        if (createdCol > 0) {
+          rowValues[headers.indexOf('createdAt')] = sheet.getRange(rowIdx, createdCol).getValue();
         }
       }
+      sheet.getRange(rowIdx, 1, 1, rowValues.length).setValues([rowValues]);
+      return Number(id);
     }
 
     var newId = id || Date.now();
@@ -214,7 +229,7 @@ var SheetService = (function () {
       }
     }
 
-    upsertRow_(CONFIG.SHEETS.PROJECTS, id, {
+    var newId = upsertRow_(CONFIG.SHEETS.PROJECTS, id, {
       id: id || '',
       name: name,
       department: department,
@@ -224,7 +239,7 @@ var SheetService = (function () {
       createdAt: ''
     }, ['id', 'name', 'department', 'emails', 'driveUrl', 'isDemo', 'createdAt', 'updatedAt']);
     invalidateCache_();
-    return { success: true };
+    return { success: true, id: newId };
   }
 
   function saveLicense(data) {
@@ -254,31 +269,19 @@ var SheetService = (function () {
     var step = data.step || '';
     var note = data.note || '';
 
+    var ss = ensureInitialized();
     if (step) {
-      var licenses = readTable_(CONFIG.SHEETS.LICENSES);
-      for (var i = 0; i < licenses.length; i++) {
-        if (String(licenses[i].id) === String(licenseId)) {
-          upsertRow_(CONFIG.SHEETS.LICENSES, Number(licenseId), {
-            id: licenseId,
-            projectId: licenses[i].projectId,
-            name: licenses[i].name,
-            issueDate: formatDateValue_(licenses[i].issueDate),
-            expiryDate: formatDateValue_(licenses[i].expiryDate),
-            alertMonths: licenses[i].alertMonths,
-            driveUrl: licenses[i].driveUrl,
-            status: step,
-            steps: licenses[i].steps,
-            createdAt: licenses[i].createdAt
-          }, [
-            'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
-            'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
-          ]);
-          break;
-        }
+      var licSheet = ss.getSheetByName(CONFIG.SHEETS.LICENSES);
+      var rowIdx = findDataRow_(licSheet, licenseId);
+      if (rowIdx > 0) {
+        var headers = licSheet.getRange(1, 1, 1, licSheet.getLastColumn()).getValues()[0];
+        var statusCol = headers.indexOf('status') + 1;
+        var updatedCol = headers.indexOf('updatedAt') + 1;
+        if (statusCol > 0) licSheet.getRange(rowIdx, statusCol).setValue(step);
+        if (updatedCol > 0) licSheet.getRange(rowIdx, updatedCol).setValue(new Date().toISOString());
       }
     }
 
-    var ss = ensureInitialized();
     var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     sheet.appendRow([

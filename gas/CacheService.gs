@@ -1,6 +1,6 @@
 var PayloadCache = (function () {
   var KEY = 'payload_v1';
-  var TTL = 90;
+  var TTL = 300;
 
   function get() {
     var raw = CacheService.getScriptCache().get(KEY);
