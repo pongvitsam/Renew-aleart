@@ -10,5 +10,16 @@ const CONFIG = {
 (function applyQueryApiUrl() {
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get('apiUrl');
-  if (fromQuery) CONFIG.API_URL = decodeURIComponent(fromQuery);
+  if (fromQuery && fromQuery.trim()) {
+    CONFIG.API_URL = decodeURIComponent(fromQuery.trim());
+  }
+})();
+
+/** Base path สำหรับ GitHub Pages (repo: Renew-aleart) */
+(function setAppBase() {
+  if (/github\.io$/i.test(location.hostname) && location.pathname.includes('/Renew-aleart')) {
+    window.APP_BASE = '/Renew-aleart/';
+  } else {
+    window.APP_BASE = '';
+  }
 })();

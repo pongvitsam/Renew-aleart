@@ -1,10 +1,14 @@
 const Api = {
   async call(action, data = {}) {
-    if (!CONFIG.API_URL) {
+    if (typeof CONFIG === 'undefined') {
+      throw new Error('โหลด config.js ไม่สำเร็จ — ลอง Ctrl+F5 หรือตรวจ path บน GitHub Pages (/Renew-aleart/)');
+    }
+    const apiUrl = (CONFIG.API_URL || '').trim();
+    if (!apiUrl) {
       throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน config.js — Deploy Apps Script แล้วใส่ URL /exec');
     }
 
-    const response = await fetch(CONFIG.API_URL, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -19,8 +23,8 @@ const Api = {
       throw new Error('ตอบกลับจาก API ไม่ถูกต้อง — ตรวจสอบการ Deploy Web App');
     }
 
-    if (!json.success && json.error) {
-      throw new Error(json.error);
+    if (json.success === false) {
+      throw new Error(json.error || 'API ตอบกลับไม่สำเร็จ');
     }
     return json;
   },
