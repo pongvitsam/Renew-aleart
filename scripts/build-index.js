@@ -11,18 +11,12 @@ const projectModal = modal('projectModal', 'max-w-lg', `
 <${d} class="p-5 space-y-4 overflow-y-auto flex-1">
 <input type="hidden" id="project-id">
 <label class="block text-sm font-bold">ชื่อโครงการ *<input id="project-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
-<label class="block text-sm font-bold">แผนก *<select id="project-department" class="w-full border rounded-xl px-4 py-3 mt-1">
-<option value="">-- เลือก --</option>
-<option value="ก่อสร้างและวิศวกรรม">ก่อสร้างและวิศวกรรม</option>
-<option value="นิติบุคคลอาคารชุด">นิติบุคคลอาคารชุด</option>
-<option value="บริหารทรัพยากรอาคาร">บริหารทรัพยากรอาคาร</option>
-<option value="ส่วนกลาง (HQ)">ส่วนกลาง (HQ)</option>
-<option value="อื่นๆ">อื่นๆ</option>
-</select></label>
-<label class="block text-sm font-bold">อีเมล (อย่างน้อย 5) *
+<label class="block text-sm font-bold">แผนก * <button type="button" onclick="closeModal('projectModal');openDepartmentModal()" class="text-xs text-indigo-600 font-bold ml-1">จัดการแผนก</button>
+<select id="project-department" class="w-full border rounded-xl px-4 py-3 mt-1 block"><option value="">-- เลือกแผนก --</option></select></label>
+<label class="block text-sm font-bold">อีเมลรับแจ้งเตือน (ไม่บังคับ)
 <${d} class="border rounded-xl p-2 mt-1"><${d} id="email-tags" class="flex flex-wrap gap-2 mb-2"></${d}>
-<input type="email" id="email-input" onkeydown="handleEmailInput(event)" class="w-full outline-none text-sm"></${d}>
-<span id="email-counter" class="text-xs font-bold text-rose-500">0/5</span></label>
+<input type="email" id="email-input" onkeydown="handleEmailInput(event)" placeholder="พิมพ์อีเมลแล้วกด Enter" class="w-full outline-none text-sm"></${d}>
+<span id="email-counter" class="text-xs font-bold text-slate-500">ไม่บังคับ</span></label>
 </${d}>
 <${d} class="p-5 border-t flex gap-3">
 <button type="button" onclick="closeModal('projectModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
@@ -58,6 +52,14 @@ const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 <${d} class="p-4 flex-1 overflow-y-auto bg-slate-50"><p class="text-sm font-bold mb-2">ประวัติ <span id="log-count">0</span></p><${d} id="history-log-container"></${d}></${d}>
 </${d}></${d}>`);
 
+const departmentModal = modal('departmentModal', 'max-w-md', `
+<${d} class="bg-slate-800 p-5 text-white font-bold flex justify-between"><span>จัดการแผนก</span><button type="button" onclick="closeModal('departmentModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="p-5 space-y-3 flex-1 overflow-y-auto">
+<${d} class="flex gap-2"><input id="new-department-name" type="text" placeholder="ชื่อแผนกใหม่" class="flex-1 border rounded-xl px-3 py-2 text-sm"><button type="button" onclick="addDepartment()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold">เพิ่ม</button></${d}>
+<p class="text-xs text-slate-500">ลบได้เฉพาะแผนกที่ยังไม่มีโครงการ</p>
+<${d} id="department-list" class="space-y-2"></${d}>
+</${d}>`);
+
 const testModal = modal('testEmailModal', 'max-w-2xl', `
 <${d} class="p-5 border-b font-bold flex justify-between"><span>ทดสอบอีเมล</span><button type="button" onclick="closeModal('testEmailModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 flex-1 overflow-y-auto space-y-4">
@@ -73,7 +75,7 @@ const testModal = modal('testEmailModal', 'max-w-2xl', `
 const html = [
   '<!DOCTYPE html><html lang="th"><head>',
   '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
-  '<title>License Monitor</title>',
+  '<title>Renew Aleart</title>',
   '<script src="https://cdn.tailwindcss.com"></script>',
   '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">',
   '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet">',
@@ -81,13 +83,13 @@ const html = [
   '<script>tailwind.config={theme:{extend:{fontFamily:{sans:[\'Inter\',\'Sarabun\',\'sans-serif\']}}}}</script>',
   '</head><body class="text-slate-800 h-screen flex overflow-hidden">',
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><p class="bg-white px-6 py-4 rounded-xl shadow font-bold text-indigo-600"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</p></${d}>`,
-  `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> LicenseMonitor</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
+  `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
   '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
-  `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-xl gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Monitor</${d}>`,
-  `<${d} class="p-4"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl mb-3"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button></${d}>`,
+  `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-lg gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Renew Aleart</${d}>`,
+  `<${d} class="p-4 space-y-2"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button><button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button><button type="button" onclick="loadDemoData()" class="w-full bg-amber-600/90 text-white py-2.5 rounded-xl text-sm font-bold"><i class="fa-solid fa-flask"></i> โหลดข้อมูลทดลอง</button></${d}>`,
   `<${d} class="px-4 pb-3"><input type="text" id="project-search" onkeyup="renderSidebar()" placeholder="ค้นหาโครงการ" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
-  '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; 2026 License Monitor</p>',
+  '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; Pongvit Y. 2026 License</p>',
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
   '<main class="flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
@@ -99,15 +101,17 @@ const html = [
   licenseModal,
   timelineModal,
   testModal,
-  '<script src="/Renew-aleart/assets/js/config.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/api.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/utils.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-state.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-sidebar.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-dashboard.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-project.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-modals.js?v=4"></script>',
-  '<script src="/Renew-aleart/assets/js/app-main.js?v=4"></script>',
+  departmentModal,
+  '<script src="/Renew-aleart/assets/js/config.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/api.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/utils.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-state.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-departments.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-sidebar.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-dashboard.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-project.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-modals.js?v=5"></script>',
+  '<script src="/Renew-aleart/assets/js/app-main.js?v=5"></script>',
   '</body></html>'
 ].join('');
 

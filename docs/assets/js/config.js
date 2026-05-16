@@ -1,10 +1,10 @@
 /**
  * Google Apps Script Web App URL (/exec)
- * Script Project ID: 1zgHFhb67AAWEFKPAadw0UjYJVclLxi5KfqV2imWL2bX8-JuLalTS1ojW
  */
 const CONFIG = {
   API_URL: 'https://script.google.com/macros/s/AKfycbwHQDLwLQASVx3SUssZAyaN4zjoWuJt4wIlaw51qhrBVUHpAO7FdW30nR-Bs7SNX499/exec',
-  APP_TITLE: 'License Monitor - ระบบแจ้งเตือนต่ออายุใบอนุญาต'
+  APP_TITLE: 'Renew Aleart — ระบบแจ้งเตือนต่ออายุใบอนุญาต',
+  APP_NAME: 'Renew Aleart'
 };
 
 (function applyQueryApiUrl() {
@@ -12,14 +12,5 @@ const CONFIG = {
   const fromQuery = params.get('apiUrl');
   if (fromQuery && fromQuery.trim()) {
     CONFIG.API_URL = decodeURIComponent(fromQuery.trim());
-  }
-})();
-
-/** Base path สำหรับ GitHub Pages (repo: Renew-aleart) */
-(function setAppBase() {
-  if (/github\.io$/i.test(location.hostname) && location.pathname.includes('/Renew-aleart')) {
-    window.APP_BASE = '/Renew-aleart/';
-  } else {
-    window.APP_BASE = '';
   }
 })();

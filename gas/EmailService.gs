@@ -17,7 +17,7 @@ var EmailService = (function () {
       '<p><b>วันหมดอายุ:</b> ' + expStr + '</p>',
       '<p><b>คงเหลือ:</b> <span style="color:#e11d48;font-weight:bold;">' + remainText + '</span></p>',
       license.driveUrl ? '<p><a href="' + license.driveUrl + '">เปิดเอกสาร Google Drive</a></p>' : '',
-      '<hr><p style="font-size:12px;color:#64748b;">ส่งจากระบบ License Monitor — Renew Alert</p>',
+      '<hr><p style="font-size:12px;color:#64748b;">ส่งจากระบบ Renew Aleart — © Pongvit Y.</p>',
       '</div>'
     ].join('');
   }
@@ -54,6 +54,9 @@ var EmailService = (function () {
 
     var subject = '[แจ้งเตือน] ใบอนุญาตหมดอายุ - ' + license.name;
     var htmlBody = buildAlertHtml_(project, license);
+    if (!project.emails || project.emails.length === 0) {
+      throw new Error('โครงการนี้ยังไม่มีอีเมลรับแจ้งเตือน — กรุณาเพิ่มอีเมลในโครงการก่อน');
+    }
     var recipients = project.emails.join(',');
 
     MailApp.sendEmail({
@@ -80,6 +83,7 @@ var EmailService = (function () {
     var sent = 0;
 
     projects.forEach(function (project) {
+      if (!project.emails || project.emails.length === 0) return;
       project.licenses.forEach(function (license) {
         var exp = new Date(license.expiryDate);
         var diffDays = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));

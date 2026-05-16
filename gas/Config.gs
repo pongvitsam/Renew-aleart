@@ -1,14 +1,21 @@
 /**
- * ตั้งค่าระบบ — สร้าง Spreadsheet ใหม่แล้ววาง ID ใน Script Properties ชื่อ SPREADSHEET_ID
- * หรือรันฟังก์ชัน setupSpreadsheet() ครั้งแรก
+ * ตั้งค่าระบบ — สร้าง Spreadsheet ใหม่แล้วรัน setupSpreadsheet()
  */
 var CONFIG = {
   SHEETS: {
     PROJECTS: 'Projects',
     LICENSES: 'Licenses',
-    HISTORY: 'History'
+    HISTORY: 'History',
+    DEPARTMENTS: 'Departments'
   },
-  PROP_SPREADSHEET_ID: 'https://script.google.com/macros/s/AKfycbwHQDLwLQASVx3SUssZAyaN4zjoWuJt4wIlaw51qhrBVUHpAO7FdW30nR-Bs7SNX499/exec',
+  PROP_SPREADSHEET_ID: 'SPREADSHEET_ID',
+  DEFAULT_DEPARTMENTS: [
+    'ก่อสร้างและวิศวกรรม',
+    'นิติบุคคลอาคารชุด',
+    'บริหารทรัพยากรอาคาร',
+    'ส่วนกลาง (HQ)',
+    'อื่นๆ'
+  ],
   DEFAULT_STEPS: [
     'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
     'ขอเอกสารสนับสนุนจากลูกค้า',

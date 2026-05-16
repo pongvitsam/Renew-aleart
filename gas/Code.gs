@@ -1,12 +1,11 @@
 /**
- * Web App entry — Deploy เป็น Web App (Anyone) แล้วนำ URL /exec ไปใส่ docs/assets/js/config.js
+ * Web App — Deploy แล้วใส่ URL /exec ใน docs/assets/js/config.js
  */
 
 function doGet(e) {
   var action = (e && e.parameter && e.parameter.action) || 'ping';
   try {
-    var result = routeAction_(action, e && e.parameter ? e.parameter : {});
-    return jsonResponse_(result);
+    return jsonResponse_(routeAction_(action, e && e.parameter ? e.parameter : {}));
   } catch (err) {
     return jsonResponse_({ success: false, error: err.message });
   }
@@ -19,31 +18,49 @@ function doPost(e) {
       body = JSON.parse(e.postData.contents);
     }
     var action = body.action || 'getProjects';
-    var result = routeAction_(action, body.data || body);
-    return jsonResponse_(result);
+    return jsonResponse_(routeAction_(action, body.data || body));
   } catch (err) {
     return jsonResponse_({ success: false, error: err.message });
   }
 }
 
 function routeAction_(action, data) {
+  var payload = function () {
+    var p = SheetService.getPayload();
+    return { success: true, projects: p.projects, departments: p.departments };
+  };
+
   switch (action) {
     case 'ping':
-      return { success: true, message: 'License Monitor API', version: '1.0.0' };
+      return { success: true, message: 'Renew Aleart API', version: '1.1.0' };
     case 'getProjects':
-      return { success: true, projects: SheetService.getAllData() };
+      return payload();
     case 'saveProject':
       SheetService.saveProject(data);
-      return { success: true, projects: SheetService.getAllData() };
+      return payload();
     case 'saveLicense':
       SheetService.saveLicense(data);
-      return { success: true, projects: SheetService.getAllData() };
+      return payload();
     case 'saveTimelineUpdate':
       SheetService.saveTimelineUpdate(data);
-      return { success: true, projects: SheetService.getAllData() };
+      return payload();
+    case 'saveDepartment':
+      DepartmentService.saveDepartment(data);
+      return payload();
+    case 'deleteDepartment':
+      DepartmentService.deleteDepartment(data);
+      return payload();
+    case 'seedMockData':
+      var seed = MockDataService.seedMockData(!!data.force);
+      var p = SheetService.getPayload();
+      seed.projects = p.projects;
+      seed.departments = p.departments;
+      return seed;
     case 'sendTestEmail':
       var emailResult = EmailService.sendTestEmail(data);
-      emailResult.projects = SheetService.getAllData();
+      var full = SheetService.getPayload();
+      emailResult.projects = full.projects;
+      emailResult.departments = full.departments;
       return emailResult;
     case 'setupSpreadsheet':
       return SheetService.setupSpreadsheet();
@@ -53,28 +70,25 @@ function routeAction_(action, data) {
 }
 
 function jsonResponse_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
+  return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
-/** รันครั้งแรกใน Editor: สร้าง Sheet และบันทึก ID */
 function setupSpreadsheet() {
   return SheetService.setupSpreadsheet();
 }
 
-/** ตั้ง trigger รายวัน 08:00 น. */
+function seedMockData() {
+  return MockDataService.seedMockData(false);
+}
+
 function installDailyTrigger() {
   ScriptApp.getProjectTriggers().forEach(function (t) {
     if (t.getHandlerFunction() === 'checkAndSendExpiryAlerts') {
       ScriptApp.deleteTrigger(t);
     }
   });
-  ScriptApp.newTrigger('checkAndSendExpiryAlerts')
-    .timeBased()
-    .everyDays(1)
-    .atHour(8)
-    .create();
+  ScriptApp.newTrigger('checkAndSendExpiryAlerts').timeBased().everyDays(1).atHour(8).create();
   return { success: true };
 }
 

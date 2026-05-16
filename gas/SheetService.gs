@@ -1,18 +1,18 @@
 var SheetService = (function () {
 
   function setupSpreadsheet() {
-    var ss = SpreadsheetApp.create('License Monitor - Renew Alert');
-    var props = PropertiesService.getScriptProperties();
-    props.setProperty(CONFIG.PROP_SPREADSHEET_ID, ss.getId());
+    var ss = SpreadsheetApp.create('Renew Aleart - License');
+    PropertiesService.getScriptProperties().setProperty(CONFIG.PROP_SPREADSHEET_ID, ss.getId());
     initSheets_(ss);
-    Logger.log('Spreadsheet ID: ' + ss.getId());
-    Logger.log('URL: ' + ss.getUrl());
+    DepartmentService.seedDefaultsIfEmpty_();
+    MockDataService.seedMockData(false);
     return { spreadsheetId: ss.getId(), url: ss.getUrl() };
   }
 
   function initSheets_(ss) {
+    ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
     ensureSheet_(ss, CONFIG.SHEETS.PROJECTS, [
-      'id', 'name', 'department', 'emails', 'createdAt', 'updatedAt'
+      'id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt'
     ]);
     ensureSheet_(ss, CONFIG.SHEETS.LICENSES, [
       'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
@@ -25,9 +25,7 @@ var SheetService = (function () {
 
   function ensureSheet_(ss, name, headers) {
     var sheet = ss.getSheetByName(name);
-    if (!sheet) {
-      sheet = ss.insertSheet(name);
-    }
+    if (!sheet) sheet = ss.insertSheet(name);
     if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
@@ -35,17 +33,32 @@ var SheetService = (function () {
     }
   }
 
+  function migrateSheets_(ss) {
+    var proj = ss.getSheetByName(CONFIG.SHEETS.PROJECTS);
+    if (proj && proj.getLastRow() > 0) {
+      var h = proj.getRange(1, 1, 1, proj.getLastColumn()).getValues()[0];
+      if (h.indexOf('isDemo') === -1) {
+        proj.getRange(1, h.length + 1).setValue('isDemo');
+      }
+    }
+    if (!ss.getSheetByName(CONFIG.SHEETS.DEPARTMENTS)) {
+      ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
+    }
+  }
+
   function ensureInitialized() {
     var ss = getSpreadsheet_();
     initSheets_(ss);
+    migrateSheets_(ss);
+    DepartmentService.seedDefaultsIfEmpty_();
     return ss;
   }
 
   function readTable_(sheetName) {
     var ss = ensureInitialized();
     var sheet = ss.getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2) return [];
     var data = sheet.getDataRange().getValues();
-    if (data.length < 2) return [];
     var headers = data[0];
     var rows = [];
     for (var i = 1; i < data.length; i++) {
@@ -58,13 +71,26 @@ var SheetService = (function () {
     return rows;
   }
 
+  function appendRow_(sheetName, rowObj, headers) {
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(sheetName);
+    var now = new Date().toISOString();
+    var rowValues = headers.map(function (h) {
+      if (h === 'createdAt' || h === 'updatedAt') return now;
+      return rowObj[h] !== undefined ? rowObj[h] : '';
+    });
+    rowValues[0] = rowObj.id || Date.now();
+    sheet.appendRow(rowValues);
+    return Number(rowValues[0]);
+  }
+
   function parseJson_(str, fallback) {
     if (!str) return fallback;
-    try {
-      return JSON.parse(String(str));
-    } catch (e) {
-      return fallback;
-    }
+    try { return JSON.parse(String(str)); } catch (e) { return fallback; }
+  }
+
+  function isDemoRow_(p) {
+    return p.isDemo === true || p.isDemo === 'true' || String(p.name).indexOf('[ทดลอง]') === 0;
   }
 
   function getAllData() {
@@ -81,12 +107,6 @@ var SheetService = (function () {
         date: formatDateValue_(h.date),
         action: h.action || '',
         note: h.note || ''
-      });
-    });
-
-    Object.keys(historyByLicense).forEach(function (lid) {
-      historyByLicense[lid].sort(function (a, b) {
-        return String(a.date).localeCompare(String(b.date));
       });
     });
 
@@ -113,9 +133,17 @@ var SheetService = (function () {
         name: p.name,
         department: p.department || '',
         emails: parseJson_(p.emails, []),
+        isDemo: isDemoRow_(p),
         licenses: licensesByProject[String(p.id)] || []
       };
     });
+  }
+
+  function getPayload() {
+    return {
+      projects: getAllData(),
+      departments: DepartmentService.getDepartments()
+    };
   }
 
   function formatDateValue_(val) {
@@ -132,7 +160,6 @@ var SheetService = (function () {
     var ss = ensureInitialized();
     var sheet = ss.getSheetByName(sheetName);
     var data = sheet.getDataRange().getValues();
-    var headerRow = data[0];
     var now = new Date().toISOString();
     var rowValues = headers.map(function (h) {
       if (h === 'updatedAt') return now;
@@ -143,6 +170,7 @@ var SheetService = (function () {
     if (id) {
       for (var i = 1; i < data.length; i++) {
         if (String(data[i][0]) === String(id)) {
+          if (rowObj.createdAt) rowValues[headers.indexOf('createdAt')] = data[i][headers.indexOf('createdAt')];
           sheet.getRange(i + 1, 1, 1, rowValues.length).setValues([rowValues]);
           return Number(id);
         }
@@ -157,17 +185,31 @@ var SheetService = (function () {
 
   function saveProject(data) {
     var emails = data.emails || [];
-    if (emails.length < 5) {
-      throw new Error('ต้องระบุอีเมลอย่างน้อย 5 อีเมล');
-    }
+    var name = (data.name || '').trim();
+    var department = (data.department || '').trim();
+    if (!name) throw new Error('กรุณาระบุชื่อโครงการ');
+    if (!department) throw new Error('กรุณาเลือกแผนก');
+
     var id = data.id ? Number(data.id) : null;
+    var existingDemo = 'false';
+    if (id) {
+      var rows = readTable_(CONFIG.SHEETS.PROJECTS);
+      for (var i = 0; i < rows.length; i++) {
+        if (Number(rows[i].id) === id) {
+          existingDemo = isDemoRow_(rows[i]) ? 'true' : 'false';
+          break;
+        }
+      }
+    }
+
     upsertRow_(CONFIG.SHEETS.PROJECTS, id, {
       id: id || '',
-      name: data.name,
-      department: data.department,
+      name: name,
+      department: department,
       emails: JSON.stringify(emails),
+      isDemo: data.isDemo === true || data.isDemo === 'true' ? 'true' : existingDemo,
       createdAt: ''
-    }, ['id', 'name', 'department', 'emails', 'createdAt', 'updatedAt']);
+    }, ['id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt']);
     return { success: true };
   }
 
@@ -221,23 +263,6 @@ var SheetService = (function () {
       }
     }
 
-    var historyId = Date.now();
-    var ss = ensureInitialized();
-    var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
-    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-    sheet.appendRow([
-      historyId,
-      licenseId,
-      today,
-      step || 'บันทึกทั่วไป',
-      note,
-      new Date().toISOString()
-    ]);
-
-    return { success: true };
-  }
-
-  function addHistoryEntry(licenseId, action, note) {
     var ss = ensureInitialized();
     var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -245,19 +270,33 @@ var SheetService = (function () {
       Date.now(),
       licenseId,
       today,
-      action,
+      step || 'บันทึกทั่วไป',
       note,
       new Date().toISOString()
     ]);
+    return { success: true };
+  }
+
+  function addHistoryEntry(licenseId, action, note) {
+    appendRow_(CONFIG.SHEETS.HISTORY, {
+      id: Date.now(),
+      licenseId: licenseId,
+      date: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd'),
+      action: action,
+      note: note
+    }, ['id', 'licenseId', 'date', 'action', 'note', 'createdAt']);
   }
 
   return {
     setupSpreadsheet: setupSpreadsheet,
     getAllData: getAllData,
+    getPayload: getPayload,
     saveProject: saveProject,
     saveLicense: saveLicense,
     saveTimelineUpdate: saveTimelineUpdate,
     addHistoryEntry: addHistoryEntry,
-    readTable_: readTable_
+    readTable_: readTable_,
+    appendRow_: appendRow_,
+    ensureInitialized: ensureInitialized
   };
 })();

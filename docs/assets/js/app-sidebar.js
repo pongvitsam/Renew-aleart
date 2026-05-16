@@ -45,7 +45,7 @@ function renderSidebar() {
         (active ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800 hover:text-white border border-transparent');
       btn.onclick = () => renderProjectView(project.id);
       btn.innerHTML =
-        '<span class="truncate pr-2">' + Utils.escapeHtml(project.name) + '</span>' +
+        '<span class="truncate pr-2">' + Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</span>' +
         '<span class="bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded-md shrink-0">' + (project.licenses?.length || 0) + '</span>';
       li.appendChild(btn);
       ul.appendChild(li);

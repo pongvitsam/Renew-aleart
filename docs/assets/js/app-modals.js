@@ -32,17 +32,17 @@ function renderEmailTags() {
     span.append(btn);
     container.append(span);
   });
-  counter.textContent = App.tempEmails.length + '/5';
-  counter.className = App.tempEmails.length >= 5 ? 'font-bold text-emerald-500' : 'font-bold text-rose-500';
+  counter.textContent = App.tempEmails.length ? App.tempEmails.length + ' อีเมล' : 'ไม่บังคับ';
+  counter.className = 'text-xs font-bold text-slate-500';
 }
 
 function openProjectModal(projectId = null) {
   document.getElementById('project-id').value = '';
   document.getElementById('project-name').value = '';
-  document.getElementById('project-department').value = '';
   document.getElementById('email-input').value = '';
   App.tempEmails = [];
   const title = document.getElementById('projectModalTitle');
+  let dept = '';
 
   if (projectId) {
     const project = App.projects.find(p => p.id === projectId);
@@ -50,12 +50,13 @@ function openProjectModal(projectId = null) {
       title.textContent = 'แก้ไขโครงการ';
       document.getElementById('project-id').value = project.id;
       document.getElementById('project-name').value = project.name;
-      document.getElementById('project-department').value = project.department || '';
+      dept = project.department || '';
       App.tempEmails = [...(project.emails || [])];
     }
   } else {
     title.textContent = 'เพิ่มโครงการใหม่';
   }
+  populateDepartmentSelect(dept);
   renderEmailTags();
   openModal('projectModal');
 }
@@ -65,12 +66,11 @@ async function saveProject() {
   const name = document.getElementById('project-name').value.trim();
   const department = document.getElementById('project-department').value;
   if (!name || !department) return showToast('กรุณากรอกชื่อและแผนก', 'error');
-  if (App.tempEmails.length < 5) return showToast('ต้องระบุอีเมลอย่างน้อย 5 อีเมล', 'error');
 
   Utils.setLoading(true);
   try {
     const res = await Api.saveProject({ id: id || undefined, name, department, emails: App.tempEmails });
-    App.projects = res.projects || [];
+    applyServerData(res);
     closeModal('projectModal');
     showToast('บันทึกโครงการสำเร็จ');
     renderSidebar();
@@ -111,7 +111,7 @@ async function saveLicense() {
       projectId: App.currentProjectId,
       name, issueDate, expiryDate, alertMonths, driveUrl, steps
     });
-    App.projects = res.projects || [];
+    applyServerData(res);
     closeModal('licenseModal');
     showToast('บันทึกใบอนุญาตสำเร็จ');
     renderProjectView(App.currentProjectId);
@@ -170,7 +170,7 @@ async function saveTimelineUpdate() {
   Utils.setLoading(true);
   try {
     const res = await Api.saveTimelineUpdate({ licenseId, step, note });
-    App.projects = res.projects || [];
+    applyServerData(res);
     showToast('บันทึกประวัติสำเร็จ');
     document.getElementById('update-note').value = '';
     renderTimeline(App.currentProjectId, Number(licenseId));
@@ -207,7 +207,8 @@ function updateMockEmailPreview() {
   const exp = new Date(l.expiryDate);
   const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
   const expStr = exp.getDate() + ' ' + months[exp.getMonth()] + ' ' + (exp.getFullYear() + 543);
-  preview.innerHTML = '<p><b>To:</b> ' + Utils.escapeHtml(project.emails.join(', ')) + '</p>' +
+  const to = (project.emails && project.emails.length) ? project.emails.join(', ') : '(ยังไม่มีอีเมล — ไม่สามารถส่งจริงได้)';
+  preview.innerHTML = '<p><b>To:</b> ' + Utils.escapeHtml(to) + '</p>' +
     '<p><b>Subj:</b> [แจ้งเตือน] ' + Utils.escapeHtml(l.name) + '</p>' +
     '<p>โครงการ: ' + Utils.escapeHtml(project.name) + '<br>หมดอายุ: ' + expStr + '</p>';
 }
@@ -224,8 +225,7 @@ async function sendTestEmail() {
       licenseId: select.value,
       saveLog
     });
-    if (res.projects) App.projects = res.projects;
-    else await loadProjects();
+    applyServerData(res);
     closeModal('testEmailModal');
     showToast('ส่งอีเมลทดสอบสำเร็จ');
     if (App.currentView === 'project') renderProjectView(App.activeTestProjectId);

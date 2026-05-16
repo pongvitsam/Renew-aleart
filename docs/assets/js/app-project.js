@@ -12,7 +12,7 @@ function renderProjectView(projectId) {
 
   document.getElementById('page-title').innerHTML =
     '<span class="flex items-center gap-3 w-full truncate"><i class="fa-regular fa-building text-indigo-500"></i>' +
-    Utils.escapeHtml(project.name) +
+    Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) +
     '<button type="button" onclick="openProjectModal(' + project.id + ')" class="ml-2 text-xs bg-slate-100 px-2 py-1 rounded border">แก้ไข</button></span>';
 
   const content = document.getElementById('main-content');
@@ -21,10 +21,17 @@ function renderProjectView(projectId) {
   const header = document.createElement('section');
   header.className = 'bg-white p-5 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 justify-between';
   const emailWrap = document.createElement('div');
-  emailWrap.innerHTML = '<p class="text-xs font-bold text-slate-400 uppercase mb-2">อีเมลรับแจ้งเตือน</p>';
+  emailWrap.innerHTML = '<p class="text-xs font-bold text-slate-400 uppercase mb-2">อีเมลรับแจ้งเตือน (ไม่บังคับ)</p>';
   const emailTags = document.createElement('p');
   emailTags.className = 'flex flex-wrap gap-2 text-[11px]';
-  (project.emails || []).forEach(e => {
+  const emails = project.emails || [];
+  if (!emails.length) {
+    const none = document.createElement('span');
+    none.className = 'text-xs text-slate-400 italic';
+    none.textContent = 'ยังไม่ได้ตั้งอีเมลแจ้งเตือน';
+    emailTags.append(none);
+  }
+  emails.forEach(e => {
     const s = document.createElement('span');
     s.className = 'bg-slate-100 px-2 py-1 rounded border';
     s.textContent = e;
