@@ -113,8 +113,8 @@ const html = [
   timelineModal,
   testModal,
   departmentModal,
-  '<script src="/Renew-aleart/assets/js/config.js?v=11"></script>',
-  '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=11"></script>',
+  '<script src="/Renew-aleart/assets/js/config.js?v=12"></script>',
+  '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=12"></script>',
   '</body></html>'
 ].join('');
 

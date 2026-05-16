@@ -4,6 +4,7 @@ var SheetService = (function () {
     var ss = SpreadsheetApp.create('Renew Aleart - License');
     PropertiesService.getScriptProperties().setProperty(CONFIG.PROP_SPREADSHEET_ID, ss.getId());
     initSheets_(ss);
+    PropertiesService.getScriptProperties().setProperty(SCHEMA_READY_KEY_, '1');
     DepartmentService.seedDefaultsIfEmpty_();
     MockDataService.seedMockData(false);
     return { spreadsheetId: ss.getId(), url: ss.getUrl() };
@@ -53,10 +54,19 @@ var SheetService = (function () {
     }
   }
 
+  var SCHEMA_READY_KEY_ = 'SCHEMA_READY_V3';
+  var ssInstance_ = null;
+
   function openSs_() {
+    if (ssInstance_) return ssInstance_;
     var ss = getSpreadsheet_();
-    initSheets_(ss);
-    migrateSheets_(ss);
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty(SCHEMA_READY_KEY_) !== '1') {
+      initSheets_(ss);
+      migrateSheets_(ss);
+      props.setProperty(SCHEMA_READY_KEY_, '1');
+    }
+    ssInstance_ = ss;
     return ss;
   }
 
@@ -138,14 +148,7 @@ var SheetService = (function () {
     };
   }
 
-  function getAllData(includeHistory) {
-    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
-    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
-    var historyByLicense = {};
-    if (includeHistory) {
-      historyByLicense = buildHistoryMap_(readTable_(CONFIG.SHEETS.HISTORY));
-    }
-
+  function buildProjectsFromRows_(projectRows, licenseRows, includeHistory, historyByLicense) {
     var licensesByProject = {};
     licenseRows.forEach(function (l) {
       var pid = String(l.projectId);
@@ -164,6 +167,16 @@ var SheetService = (function () {
         licenses: licensesByProject[String(p.id)] || []
       };
     });
+  }
+
+  function getAllData(includeHistory) {
+    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
+    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
+    var historyByLicense = {};
+    if (includeHistory) {
+      historyByLicense = buildHistoryMap_(readTable_(CONFIG.SHEETS.HISTORY));
+    }
+    return buildProjectsFromRows_(projectRows, licenseRows, includeHistory, historyByLicense);
   }
 
   function getLicenseDetail(licenseId) {
@@ -186,8 +199,9 @@ var SheetService = (function () {
     var cached = PayloadCache.get();
     if (cached) return cached;
     var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
+    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
     var payload = {
-      projects: getAllData(false),
+      projects: buildProjectsFromRows_(projectRows, licenseRows, false, {}),
       departments: DepartmentService.getDepartmentsFromProjectRows_(projectRows)
     };
     PayloadCache.set(payload);

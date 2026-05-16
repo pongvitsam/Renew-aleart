@@ -46,6 +46,7 @@ function loadProjects() {
   }
 
   showDashboardSkeleton();
+  if (typeof Api.warmApi === 'function') Api.warmApi();
   App._syncing = true;
   Api.getProjects({ skipCache: true })
     .then(onProjectsLoaded)

@@ -1,14 +1,20 @@
 var DepartmentService = (function () {
 
   function seedDefaultsIfEmpty_() {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('DEPTS_SEEDED') === '1') return;
     var rows = SheetService.readTable_(CONFIG.SHEETS.DEPARTMENTS);
-    if (rows.length > 0) return;
+    if (rows.length > 0) {
+      props.setProperty('DEPTS_SEEDED', '1');
+      return;
+    }
     CONFIG.DEFAULT_DEPARTMENTS.forEach(function (name, i) {
       SheetService.appendRow_(CONFIG.SHEETS.DEPARTMENTS, {
         id: Date.now() + i,
         name: name
       }, ['id', 'name']);
     });
+    props.setProperty('DEPTS_SEEDED', '1');
   }
 
   function countProjectsByDepartment_(deptName) {
