@@ -8,7 +8,7 @@ var CONFIG = {
     LICENSES: 'Licenses',
     HISTORY: 'History'
   },
-  PROP_SPREADSHEET_ID: 'SPREADSHEET_ID',
+  PROP_SPREADSHEET_ID: 'https://script.google.com/macros/s/AKfycbwHQDLwLQASVx3SUssZAyaN4zjoWuJt4wIlaw51qhrBVUHpAO7FdW30nR-Bs7SNX499/exec',
   DEFAULT_STEPS: [
     'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
     'ขอเอกสารสนับสนุนจากลูกค้า',
