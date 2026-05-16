@@ -50,22 +50,26 @@ function showDashboard() {
   );
   content.appendChild(grid);
 
+  const sortedProjects = Utils.sortProjectsByPriority(App.projects);
+
   const hProjects = document.createElement('h3');
-  hProjects.className = 'text-lg font-bold text-slate-800 mb-4 flex items-center gap-2';
-  hProjects.innerHTML = '<i class="fa-solid fa-layer-group text-indigo-500"></i> สถานะแต่ละโครงการ';
+  hProjects.className = 'text-lg font-bold text-slate-800 mb-1 flex items-center gap-2';
+  hProjects.innerHTML = '<i class="fa-solid fa-layer-group text-indigo-500"></i> สถานะทุกโครงการ';
   content.appendChild(hProjects);
 
-  const pgrid = document.createElement('div');
-  pgrid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-8';
-  if (!App.projects.length) {
+  const hint = document.createElement('p');
+  hint.className = 'text-xs text-slate-500 mb-4';
+  hint.textContent = 'เรียงตามความสำคัญ: หมดอายุ → ใกล้หมดอายุ → ปกติ → ไม่มีใบอนุญาต (#1 = เร่งด่วนที่สุด)';
+  content.appendChild(hint);
+
+  if (!sortedProjects.length) {
     const empty = document.createElement('p');
-    empty.className = 'col-span-full text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed';
+    empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed mb-8';
     empty.textContent = 'ยังไม่มีโครงการ — กดโหลดข้อมูลทดลองหรือสร้างโครงการใหม่';
-    pgrid.appendChild(empty);
+    content.appendChild(empty);
   } else {
-    App.projects.forEach(p => pgrid.appendChild(buildProjectDashboardCard(p)));
+    content.appendChild(renderProjectsByPriority(sortedProjects));
   }
-  content.appendChild(pgrid);
 
   const hAlert = document.createElement('h3');
   hAlert.className = 'text-lg font-bold text-slate-800 mb-4 flex items-center gap-2';
@@ -88,9 +92,48 @@ function showDashboard() {
     ok.innerHTML = '<i class="fa-solid fa-circle-check mr-2"></i>ไม่มีใบอนุญาตที่ต้องแจ้งเตือน';
     list.appendChild(ok);
   } else {
+    alerts.sort(Utils.compareAlertsByPriority.bind(Utils));
     alerts.forEach(a => list.appendChild(buildAlertRow(a.project, a.license, a.st)));
   }
   content.appendChild(list);
+}
+
+const DASHBOARD_PRIORITY_GROUPS = [
+  { status: 'expired', label: 'เร่งด่วน — มีใบอนุญาตหมดอายุ', icon: 'fa-triangle-exclamation', headerClass: 'text-rose-700 bg-rose-50 border-rose-200' },
+  { status: 'warning', label: 'ต้องติดตาม — ใกล้หมดอายุ', icon: 'fa-clock', headerClass: 'text-amber-800 bg-amber-50 border-amber-200' },
+  { status: 'safe', label: 'ปกติ', icon: 'fa-circle-check', headerClass: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
+  { status: 'empty', label: 'ยังไม่มีใบอนุญาต', icon: 'fa-inbox', headerClass: 'text-slate-600 bg-slate-100 border-slate-200' }
+];
+
+function renderProjectsByPriority(sortedProjects) {
+  const wrap = document.createElement('div');
+  wrap.className = 'space-y-6 mb-8';
+
+  let globalRank = 0;
+  DASHBOARD_PRIORITY_GROUPS.forEach(group => {
+    const inGroup = sortedProjects.filter(p => Utils.getProjectStatus(p).status === group.status);
+    if (!inGroup.length) return;
+
+    const section = document.createElement('section');
+    const head = document.createElement('div');
+    head.className = 'flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-xl border mb-3 ' + group.headerClass;
+    head.innerHTML = '<i class="fa-solid ' + group.icon + '"></i> ' + group.label +
+      ' <span class="ml-auto text-xs font-black opacity-70">' + inGroup.length + ' โครงการ</span>';
+    section.appendChild(head);
+
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
+
+    inGroup.forEach(p => {
+      globalRank += 1;
+      grid.appendChild(buildProjectDashboardCard(p, globalRank));
+    });
+
+    section.appendChild(grid);
+    wrap.appendChild(section);
+  });
+
+  return wrap;
 }
 
 function makeStatCard(num, label, icon, tone) {
@@ -110,7 +153,7 @@ function makeStatCard(num, label, icon, tone) {
   return el;
 }
 
-function buildProjectDashboardCard(project) {
+function buildProjectDashboardCard(project, rank) {
   const st = Utils.getProjectStatus(project);
   const card = document.createElement('article');
   card.className = 'project-card ' + st.border;
@@ -118,9 +161,21 @@ function buildProjectDashboardCard(project) {
 
   const head = document.createElement('div');
   head.className = 'flex justify-between items-start gap-2 mb-2';
+  const rankBadge = rank
+    ? '<span class="text-[10px] font-black text-slate-400 bg-slate-100 border rounded px-1.5 py-0.5 shrink-0" title="ลำดับความสำคัญ">#' + rank + '</span>'
+    : '';
   head.innerHTML =
-    '<h4 class="font-bold text-slate-800 leading-snug">' + Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</h4>' +
-    '<span class="status-pill ' + st.pill + '">' + st.text + '</span>';
+    '<div class="flex items-start gap-2 min-w-0 flex-1">' + rankBadge +
+    '<h4 class="font-bold text-slate-800 leading-snug">' + Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</h4></div>' +
+    '<span class="status-pill ' + st.pill + ' shrink-0">' + st.text + '</span>';
+
+  if (head.tagName !== 'DIV') {
+    const h = document.createElement('div');
+    h.className = head.className;
+    h.innerHTML = head.innerHTML;
+    head.replaceWith(h);
+    card.appendChild(h);
+  }
 
   const dept = document.createElement('p');
   dept.className = 'text-xs text-slate-500 mb-2';
@@ -140,6 +195,16 @@ function buildProjectDashboardCard(project) {
     : '<i class="fa-brands fa-google-drive mr-1"></i>ยังไม่มีลิงก์ Drive';
 
   card.append(head, dept, counts, drive);
+
+  if (urgentDays < 99999 && st.status !== 'safe' && st.status !== 'empty') {
+    const urgent = document.createElement('p');
+    urgent.className = 'text-[11px] font-bold mt-2 ' + (urgentDays < 0 ? 'text-rose-600' : 'text-amber-600');
+    urgent.innerHTML = urgentDays < 0
+      ? '<i class="fa-solid fa-calendar-xmark mr-1"></i>หมดอายุแล้ว ' + Math.abs(urgentDays) + ' วัน'
+      : '<i class="fa-solid fa-calendar-day mr-1"></i>หมดอายุในอีก ' + urgentDays + ' วัน';
+    card.appendChild(urgent);
+  }
+
   return card;
 }
 

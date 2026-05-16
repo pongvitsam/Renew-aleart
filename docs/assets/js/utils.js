@@ -56,6 +56,59 @@
     return { status: 'safe', text: 'ปกติ', pill: 'safe', border: 'status-safe', counts };
   },
 
+  /** ลำดับความสำคัญ: หมดอายุ(0) → ใกล้หมดอายุ(1) → ปกติ(2) → ไม่มีใบอนุญาต(3) */
+  projectPriorityRank(status) {
+    return { expired: 0, warning: 1, safe: 2, empty: 3 }[status] ?? 9;
+  },
+
+  /** วันจนถึงวันหมดอายุที่เร่งด่วนที่สุด (ติดลบ = หมดอายุแล้ว) */
+  nearestUrgentExpiryDays(project) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let nearest = Infinity;
+    (project.licenses || []).forEach(l => {
+      const s = this.calculateStatus(l.expiryDate, l.alertMonths);
+      if (s.status === 'expired' || s.status === 'warning') {
+        const exp = new Date(l.expiryDate + 'T12:00:00');
+        const days = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
+        if (days < nearest) nearest = days;
+      }
+    });
+    return nearest === Infinity ? 99999 : nearest;
+  },
+
+  compareProjectsByPriority(a, b) {
+    const sa = this.getProjectStatus(a);
+    const sb = this.getProjectStatus(b);
+    const ra = this.projectPriorityRank(sa.status);
+    const rb = this.projectPriorityRank(sb.status);
+    if (ra !== rb) return ra - rb;
+
+    const da = this.nearestUrgentExpiryDays(a);
+    const db = this.nearestUrgentExpiryDays(b);
+    if (da !== db) return da - db;
+
+    if (sa.counts.expired !== sb.counts.expired) return sb.counts.expired - sa.counts.expired;
+    if (sa.counts.warning !== sb.counts.warning) return sb.counts.warning - sa.counts.warning;
+
+    return (a.name || '').localeCompare(b.name || '', 'th');
+  },
+
+  sortProjectsByPriority(projects) {
+    return [...(projects || [])].sort((a, b) => this.compareProjectsByPriority(a, b));
+  },
+
+  compareAlertsByPriority(a, b) {
+    const order = { expired: 0, warning: 1 };
+    const oa = order[a.st.status] ?? 9;
+    const ob = order[b.st.status] ?? 9;
+    if (oa !== ob) return oa - ob;
+    const da = new Date(a.license.expiryDate + 'T12:00:00').getTime();
+    const db = new Date(b.license.expiryDate + 'T12:00:00').getTime();
+    if (da !== db) return da - db;
+    return (a.project.name || '').localeCompare(b.project.name || '', 'th');
+  },
+
   debounce(fn, ms) {
     let t;
     return (...args) => {
