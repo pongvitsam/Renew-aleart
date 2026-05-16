@@ -169,14 +169,6 @@ function buildProjectDashboardCard(project, rank) {
     '<h4 class="font-bold text-slate-800 leading-snug">' + Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</h4></div>' +
     '<span class="status-pill ' + st.pill + ' shrink-0">' + st.text + '</span>';
 
-  if (head.tagName !== 'DIV') {
-    const h = document.createElement('div');
-    h.className = head.className;
-    h.innerHTML = head.innerHTML;
-    head.replaceWith(h);
-    card.appendChild(h);
-  }
-
   const dept = document.createElement('p');
   dept.className = 'text-xs text-slate-500 mb-2';
   dept.innerHTML = '<i class="fa-solid fa-tag mr-1"></i>' + Utils.escapeHtml(project.department || '-');
