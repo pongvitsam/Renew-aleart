@@ -1,0 +1,263 @@
+var SheetService = (function () {
+
+  function setupSpreadsheet() {
+    var ss = SpreadsheetApp.create('License Monitor - Renew Alert');
+    var props = PropertiesService.getScriptProperties();
+    props.setProperty(CONFIG.PROP_SPREADSHEET_ID, ss.getId());
+    initSheets_(ss);
+    Logger.log('Spreadsheet ID: ' + ss.getId());
+    Logger.log('URL: ' + ss.getUrl());
+    return { spreadsheetId: ss.getId(), url: ss.getUrl() };
+  }
+
+  function initSheets_(ss) {
+    ensureSheet_(ss, CONFIG.SHEETS.PROJECTS, [
+      'id', 'name', 'department', 'emails', 'createdAt', 'updatedAt'
+    ]);
+    ensureSheet_(ss, CONFIG.SHEETS.LICENSES, [
+      'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+      'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
+    ]);
+    ensureSheet_(ss, CONFIG.SHEETS.HISTORY, [
+      'id', 'licenseId', 'date', 'action', 'note', 'createdAt'
+    ]);
+  }
+
+  function ensureSheet_(ss, name, headers) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) {
+      sheet = ss.insertSheet(name);
+    }
+    if (sheet.getLastRow() === 0) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+    }
+  }
+
+  function ensureInitialized() {
+    var ss = getSpreadsheet_();
+    initSheets_(ss);
+    return ss;
+  }
+
+  function readTable_(sheetName) {
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(sheetName);
+    var data = sheet.getDataRange().getValues();
+    if (data.length < 2) return [];
+    var headers = data[0];
+    var rows = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        row[headers[j]] = data[i][j];
+      }
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  function parseJson_(str, fallback) {
+    if (!str) return fallback;
+    try {
+      return JSON.parse(String(str));
+    } catch (e) {
+      return fallback;
+    }
+  }
+
+  function getAllData() {
+    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
+    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
+    var historyRows = readTable_(CONFIG.SHEETS.HISTORY);
+
+    var historyByLicense = {};
+    historyRows.forEach(function (h) {
+      var lid = String(h.licenseId);
+      if (!historyByLicense[lid]) historyByLicense[lid] = [];
+      historyByLicense[lid].push({
+        id: h.id,
+        date: formatDateValue_(h.date),
+        action: h.action || '',
+        note: h.note || ''
+      });
+    });
+
+    Object.keys(historyByLicense).forEach(function (lid) {
+      historyByLicense[lid].sort(function (a, b) {
+        return String(a.date).localeCompare(String(b.date));
+      });
+    });
+
+    var licensesByProject = {};
+    licenseRows.forEach(function (l) {
+      var pid = String(l.projectId);
+      if (!licensesByProject[pid]) licensesByProject[pid] = [];
+      licensesByProject[pid].push({
+        id: Number(l.id),
+        name: l.name,
+        issueDate: formatDateValue_(l.issueDate),
+        expiryDate: formatDateValue_(l.expiryDate),
+        alertMonths: Number(l.alertMonths) || 3,
+        driveUrl: l.driveUrl || '',
+        status: l.status || '-',
+        steps: parseJson_(l.steps, CONFIG.DEFAULT_STEPS.slice()),
+        history: historyByLicense[String(l.id)] || []
+      });
+    });
+
+    return projectRows.map(function (p) {
+      return {
+        id: Number(p.id),
+        name: p.name,
+        department: p.department || '',
+        emails: parseJson_(p.emails, []),
+        licenses: licensesByProject[String(p.id)] || []
+      };
+    });
+  }
+
+  function formatDateValue_(val) {
+    if (!val) return '';
+    if (val instanceof Date) {
+      return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+    var s = String(val);
+    if (s.indexOf('T') > -1) return s.split('T')[0];
+    return s;
+  }
+
+  function upsertRow_(sheetName, id, rowObj, headers) {
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(sheetName);
+    var data = sheet.getDataRange().getValues();
+    var headerRow = data[0];
+    var now = new Date().toISOString();
+    var rowValues = headers.map(function (h) {
+      if (h === 'updatedAt') return now;
+      if (h === 'createdAt' && !id) return now;
+      return rowObj[h] !== undefined ? rowObj[h] : '';
+    });
+
+    if (id) {
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(id)) {
+          sheet.getRange(i + 1, 1, 1, rowValues.length).setValues([rowValues]);
+          return Number(id);
+        }
+      }
+    }
+
+    var newId = id || Date.now();
+    rowValues[0] = newId;
+    sheet.appendRow(rowValues);
+    return Number(newId);
+  }
+
+  function saveProject(data) {
+    var emails = data.emails || [];
+    if (emails.length < 5) {
+      throw new Error('ต้องระบุอีเมลอย่างน้อย 5 อีเมล');
+    }
+    var id = data.id ? Number(data.id) : null;
+    upsertRow_(CONFIG.SHEETS.PROJECTS, id, {
+      id: id || '',
+      name: data.name,
+      department: data.department,
+      emails: JSON.stringify(emails),
+      createdAt: ''
+    }, ['id', 'name', 'department', 'emails', 'createdAt', 'updatedAt']);
+    return { success: true };
+  }
+
+  function saveLicense(data) {
+    var steps = data.steps || CONFIG.DEFAULT_STEPS;
+    var id = data.id ? Number(data.id) : null;
+    var newId = upsertRow_(CONFIG.SHEETS.LICENSES, id, {
+      id: id || '',
+      projectId: data.projectId,
+      name: data.name,
+      issueDate: data.issueDate,
+      expiryDate: data.expiryDate,
+      alertMonths: data.alertMonths || 3,
+      driveUrl: data.driveUrl || '',
+      status: data.status || 'รอเริ่มดำเนินการ',
+      steps: JSON.stringify(steps),
+      createdAt: ''
+    }, [
+      'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+      'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
+    ]);
+    return { success: true, id: newId };
+  }
+
+  function saveTimelineUpdate(data) {
+    var licenseId = data.licenseId;
+    var step = data.step || '';
+    var note = data.note || '';
+
+    if (step) {
+      var licenses = readTable_(CONFIG.SHEETS.LICENSES);
+      for (var i = 0; i < licenses.length; i++) {
+        if (String(licenses[i].id) === String(licenseId)) {
+          upsertRow_(CONFIG.SHEETS.LICENSES, Number(licenseId), {
+            id: licenseId,
+            projectId: licenses[i].projectId,
+            name: licenses[i].name,
+            issueDate: formatDateValue_(licenses[i].issueDate),
+            expiryDate: formatDateValue_(licenses[i].expiryDate),
+            alertMonths: licenses[i].alertMonths,
+            driveUrl: licenses[i].driveUrl,
+            status: step,
+            steps: licenses[i].steps,
+            createdAt: licenses[i].createdAt
+          }, [
+            'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+            'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
+          ]);
+          break;
+        }
+      }
+    }
+
+    var historyId = Date.now();
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    sheet.appendRow([
+      historyId,
+      licenseId,
+      today,
+      step || 'บันทึกทั่วไป',
+      note,
+      new Date().toISOString()
+    ]);
+
+    return { success: true };
+  }
+
+  function addHistoryEntry(licenseId, action, note) {
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    sheet.appendRow([
+      Date.now(),
+      licenseId,
+      today,
+      action,
+      note,
+      new Date().toISOString()
+    ]);
+  }
+
+  return {
+    setupSpreadsheet: setupSpreadsheet,
+    getAllData: getAllData,
+    saveProject: saveProject,
+    saveLicense: saveLicense,
+    saveTimelineUpdate: saveTimelineUpdate,
+    addHistoryEntry: addHistoryEntry,
+    readTable_: readTable_
+  };
+})();

@@ -1,0 +1,115 @@
+const fs = require('fs');
+const path = require('path');
+const d = 'd' + 'iv';
+
+const modal = (id, maxW, inner) =>
+  `<${d} id="${id}" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">` +
+  `<${d} class="bg-white rounded-2xl shadow-2xl w-full ${maxW} max-h-[90vh] flex flex-col">${inner}</${d}></${d}>`;
+
+const projectModal = modal('projectModal', 'max-w-lg', `
+<${d} class="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 flex justify-between text-white font-bold"><span id="projectModalTitle">เพิ่มโครงการใหม่</span><button type="button" onclick="closeModal('projectModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="p-5 space-y-4 overflow-y-auto flex-1">
+<input type="hidden" id="project-id">
+<label class="block text-sm font-bold">ชื่อโครงการ *<input id="project-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
+<label class="block text-sm font-bold">แผนก *<select id="project-department" class="w-full border rounded-xl px-4 py-3 mt-1">
+<option value="">-- เลือก --</option>
+<option value="ก่อสร้างและวิศวกรรม">ก่อสร้างและวิศวกรรม</option>
+<option value="นิติบุคคลอาคารชุด">นิติบุคคลอาคารชุด</option>
+<option value="บริหารทรัพยากรอาคาร">บริหารทรัพยากรอาคาร</option>
+<option value="ส่วนกลาง (HQ)">ส่วนกลาง (HQ)</option>
+<option value="อื่นๆ">อื่นๆ</option>
+</select></label>
+<label class="block text-sm font-bold">อีเมล (อย่างน้อย 5) *
+<${d} class="border rounded-xl p-2 mt-1"><${d} id="email-tags" class="flex flex-wrap gap-2 mb-2"></${d}>
+<input type="email" id="email-input" onkeydown="handleEmailInput(event)" class="w-full outline-none text-sm"></${d}>
+<span id="email-counter" class="text-xs font-bold text-rose-500">0/5</span></label>
+</${d}>
+<${d} class="p-5 border-t flex gap-3">
+<button type="button" onclick="closeModal('projectModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="saveProject()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">บันทึก</button>
+</${d}>`);
+
+const licenseModal = modal('licenseModal', 'max-w-xl', `
+<${d} class="bg-emerald-600 p-5 text-white font-bold flex justify-between"><span>เพิ่มใบอนุญาต</span><button type="button" onclick="closeModal('licenseModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="p-5 space-y-4 overflow-y-auto flex-1">
+<label class="block text-sm font-bold">ชื่อ *<input id="license-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
+<${d} class="grid grid-cols-2 gap-4">
+<label class="text-sm font-bold">วันที่ออก *<input type="date" id="license-issue-date" class="w-full border rounded-xl p-2 mt-1"></label>
+<label class="text-sm font-bold">หมดอายุ *<input type="date" id="license-expiry-date" class="w-full border rounded-xl p-2 mt-1"></label></${d}>
+<${d} class="grid grid-cols-2 gap-4">
+<label class="text-sm font-bold">แจ้งเตือน (เดือน)<input type="number" id="license-alert-months" min="1" value="3" class="w-full border rounded-xl p-2 mt-1"></label>
+<label class="text-sm font-bold">Drive<input type="url" id="license-drive-url" class="w-full border rounded-xl p-2 mt-1"></label></${d}>
+<label class="text-sm font-bold">ขั้นตอน<textarea id="license-steps" rows="5" class="w-full border rounded-lg p-2 mt-1 text-sm"></textarea></label>
+</${d}>
+<${d} class="p-5 border-t flex gap-3">
+<button type="button" onclick="closeModal('licenseModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="saveLicense()" class="flex-[2] bg-emerald-500 text-white py-3 rounded-xl font-bold">บันทึก</button>
+</${d}>`);
+
+const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
+<${d} class="bg-purple-600 p-4 text-white font-bold flex justify-between"><span id="timelineModalTitle">อัปเดตสถานะ</span><button type="button" onclick="closeModal('timelineModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="flex flex-col md:flex-row flex-1 overflow-hidden">
+<${d} class="md:w-1/2 p-4 overflow-y-auto border-r bg-slate-50"><h4 class="text-sm font-bold mb-3">ขั้นตอน</h4><${d} id="timeline-container"></${d}></${d}>
+<${d} class="md:w-1/2 flex flex-col">
+<${d} class="p-4 border-b"><input type="hidden" id="update-license-id">
+<label class="text-xs font-bold block mb-1">ขั้นตอน<select id="update-step" class="w-full border rounded-lg p-2 text-sm"></select></label>
+<label class="text-xs font-bold block mt-2">หมายเหตุ<textarea id="update-note" rows="2" class="w-full border rounded-lg p-2 text-sm"></textarea></label>
+<button type="button" onclick="saveTimelineUpdate()" class="w-full mt-2 bg-purple-600 text-white py-2 rounded-lg font-bold text-sm">บันทึก</button></${d}>
+<${d} class="p-4 flex-1 overflow-y-auto bg-slate-50"><p class="text-sm font-bold mb-2">ประวัติ <span id="log-count">0</span></p><${d} id="history-log-container"></${d}></${d}>
+</${d}></${d}>`);
+
+const testModal = modal('testEmailModal', 'max-w-2xl', `
+<${d} class="p-5 border-b font-bold flex justify-between"><span>ทดสอบอีเมล</span><button type="button" onclick="closeModal('testEmailModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="p-5 flex-1 overflow-y-auto space-y-4">
+<label class="text-sm font-bold block">ใบอนุญาต<select id="test-email-license-select" onchange="updateMockEmailPreview()" class="w-full border rounded-xl p-3 mt-1"></select></label>
+<${d} id="mock-email-preview" class="bg-slate-50 border p-4 rounded-xl text-sm"></${d}>
+<label class="flex gap-2 text-sm"><input type="checkbox" id="test-email-save-log" checked class="mt-1"> บันทึกลงประวัติ</label>
+</${d}>
+<${d} class="p-5 border-t flex gap-3">
+<button type="button" onclick="closeModal('testEmailModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="sendTestEmail()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">ส่งทดสอบ</button>
+</${d}>`);
+
+const html = [
+  '<!DOCTYPE html><html lang="th"><head>',
+  '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
+  '<title>License Monitor</title>',
+  '<script src="https://cdn.tailwindcss.com"></script>',
+  '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">',
+  '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet">',
+  '<link rel="stylesheet" href="assets/css/app.css">',
+  '<script>tailwind.config={theme:{extend:{fontFamily:{sans:[\'Inter\',\'Sarabun\',\'sans-serif\']}}}}</script>',
+  '</head><body class="text-slate-800 h-screen flex overflow-hidden">',
+  `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><p class="bg-white px-6 py-4 rounded-xl shadow font-bold text-indigo-600"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</p></${d}>`,
+  `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> LicenseMonitor</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
+  '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
+  `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-xl gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Monitor</${d}>`,
+  `<${d} class="p-4"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl mb-3"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button></${d}>`,
+  `<${d} class="px-4 pb-3"><input type="text" id="project-search" onkeyup="renderSidebar()" placeholder="ค้นหาโครงการ" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
+  `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
+  '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; 2026 License Monitor</p>',
+  '</aside>',
+  `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
+  '<main class="flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
+  '<header class="hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><span class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> ผู้ดูแลระบบ</span></header>',
+  `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
+  '</main>',
+  `<${d} id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-3 pointer-events-none"></${d}>`,
+  projectModal,
+  licenseModal,
+  timelineModal,
+  testModal,
+  '<script src="assets/js/config.js"></script>',
+  '<script src="assets/js/api.js"></script>',
+  '<script src="assets/js/utils.js"></script>',
+  '<script src="assets/js/app-state.js"></script>',
+  '<script src="assets/js/app-sidebar.js"></script>',
+  '<script src="assets/js/app-dashboard.js"></script>',
+  '<script src="assets/js/app-project.js"></script>',
+  '<script src="assets/js/app-modals.js"></script>',
+  '<script src="assets/js/app-main.js"></script>',
+  '</body></html>'
+].join('');
+
+fs.writeFileSync(path.join(__dirname, '..', 'docs', 'index.html'), html, 'utf8');
+console.log('Wrote docs/index.html');
