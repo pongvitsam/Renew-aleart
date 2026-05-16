@@ -158,6 +158,7 @@ function buildProjectDashboardCard(project, rank) {
   const card = document.createElement('article');
   card.className = 'project-card ' + st.border;
   card.onclick = () => renderProjectView(project.id);
+  const urgentDays = Utils.nearestUrgentExpiryDays(project);
 
   const head = document.createElement('div');
   head.className = 'flex justify-between items-start gap-2 mb-2';
