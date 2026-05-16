@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '16';
+const ASSET_V = '17';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {

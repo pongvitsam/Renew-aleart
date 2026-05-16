@@ -235,6 +235,34 @@ const DataCache = {
       .join('\n');
   },
 
+  ROUND_START_ACTION: 'เริ่มรอบติดตามใหม่',
+
+  /** ประวัติที่นับเป็นความคืบหน้ารอบปัจจุบัน (หลังเริ่มรอบใหม่แล้วไม่นับ log เก่า) */
+  getCurrentRoundProgressHistory(license) {
+    const hist = [...(license?.history || [])];
+    let lastStart = -1;
+    hist.forEach((h, i) => {
+      if (h.action === this.ROUND_START_ACTION) lastStart = i;
+    });
+    if (lastStart < 0) return hist;
+    return hist.slice(lastStart + 1);
+  },
+
+  /** ประวัติที่แสดงใน panel (รวมบันทึกเริ่มรอบใหม่) */
+  getCurrentRoundDisplayHistory(license) {
+    const hist = [...(license?.history || [])];
+    let lastStart = -1;
+    hist.forEach((h, i) => {
+      if (h.action === this.ROUND_START_ACTION) lastStart = i;
+    });
+    if (lastStart < 0) return hist;
+    return hist.slice(lastStart);
+  },
+
+  currentRoundNumber(license) {
+    return this.renewalRoundCount(license) + 1;
+  },
+
   resolveStatusAfterStepsChange(steps, currentStatus, history) {
     if (!steps.length) return currentStatus || '';
     if (currentStatus && steps.includes(currentStatus)) return currentStatus;
@@ -243,12 +271,19 @@ const DataCache = {
     return next || steps[steps.length - 1];
   },
 
+  resolveStatusAfterStepsChangeForLicense(license, steps, currentStatus) {
+    const roundHist = license
+      ? this.getCurrentRoundProgressHistory(license)
+      : [];
+    return this.resolveStatusAfterStepsChange(steps, currentStatus, roundHist);
+  },
+
   isRenewalStepsComplete(license) {
     const steps = license?.steps || [];
     if (!steps.length) return false;
     const last = steps[steps.length - 1];
-    if (license.status === last) return true;
-    const hist = license.history || [];
+    const hist = this.getCurrentRoundProgressHistory(license);
+    if (license.status === last && hist.some(h => h.action === last)) return true;
     return steps.every(s => hist.some(h => h.action === s));
   },
 
@@ -1379,10 +1414,13 @@ const TimelineUI = {
       return;
     }
 
+    const roundHist = Utils.getCurrentRoundProgressHistory(license);
+    const roundNo = Utils.currentRoundNumber(license);
+
     steps.forEach((step, idx) => {
-      const done = (license.history || []).some(h => h.action === step);
+      const done = roundHist.some(h => h.action === step);
       const current = license.status === step;
-      const hist = (license.history || []).filter(h => h.action === step);
+      const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
 
       const row = document.createElement('div');
@@ -1427,10 +1465,16 @@ const TimelineUI = {
       row.append(dot, body);
       container.appendChild(row);
     });
+
+    const hint = document.createElement('p');
+    hint.className = 'text-[11px] text-slate-500 mt-3 text-center';
+    hint.textContent = 'ความคืบหน้าเฉพาะรอบที่ ' + roundNo + ' (ไม่รวมรอบเก่า)';
+    container.appendChild(hint);
   },
 
   renderLogs(license) {
-    document.getElementById('log-count').textContent = (license.history?.length || 0) + ' ครั้ง';
+    const displayHist = Utils.getCurrentRoundDisplayHistory(license);
+    document.getElementById('log-count').textContent = displayHist.length + ' ครั้ง';
     const logBox = document.getElementById('history-log-container');
     logBox.replaceChildren();
     if (license._historyLoading) {
@@ -1440,7 +1484,7 @@ const TimelineUI = {
       logBox.appendChild(loading);
       return;
     }
-    const list = [...(license.history || [])].reverse();
+    const list = [...displayHist].reverse();
     if (!list.length) {
       const empty = document.createElement('p');
       empty.className = 'text-center text-slate-400 text-sm py-6';
@@ -1526,7 +1570,7 @@ async function saveLicenseSteps() {
   const steps = Utils.parseStepsText(document.getElementById('timeline-steps-edit').value);
   if (!steps.length) return showToast('ต้องมีอย่างน้อย 1 ขั้นตอน', 'error');
 
-  const status = Utils.resolveStatusAfterStepsChange(steps, license.status, license.history);
+  const status = Utils.resolveStatusAfterStepsChangeForLicense(license, steps, license.status);
 
   Mutations.updateLicenseStepsLocal(projectId, licenseId, steps, status);
   paintTimelineModal(Mutations.findLicense(projectId, licenseId));

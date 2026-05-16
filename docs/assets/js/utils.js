@@ -188,6 +188,34 @@
       .join('\n');
   },
 
+  ROUND_START_ACTION: 'เริ่มรอบติดตามใหม่',
+
+  /** ประวัติที่นับเป็นความคืบหน้ารอบปัจจุบัน (หลังเริ่มรอบใหม่แล้วไม่นับ log เก่า) */
+  getCurrentRoundProgressHistory(license) {
+    const hist = [...(license?.history || [])];
+    let lastStart = -1;
+    hist.forEach((h, i) => {
+      if (h.action === this.ROUND_START_ACTION) lastStart = i;
+    });
+    if (lastStart < 0) return hist;
+    return hist.slice(lastStart + 1);
+  },
+
+  /** ประวัติที่แสดงใน panel (รวมบันทึกเริ่มรอบใหม่) */
+  getCurrentRoundDisplayHistory(license) {
+    const hist = [...(license?.history || [])];
+    let lastStart = -1;
+    hist.forEach((h, i) => {
+      if (h.action === this.ROUND_START_ACTION) lastStart = i;
+    });
+    if (lastStart < 0) return hist;
+    return hist.slice(lastStart);
+  },
+
+  currentRoundNumber(license) {
+    return this.renewalRoundCount(license) + 1;
+  },
+
   resolveStatusAfterStepsChange(steps, currentStatus, history) {
     if (!steps.length) return currentStatus || '';
     if (currentStatus && steps.includes(currentStatus)) return currentStatus;
@@ -196,12 +224,19 @@
     return next || steps[steps.length - 1];
   },
 
+  resolveStatusAfterStepsChangeForLicense(license, steps, currentStatus) {
+    const roundHist = license
+      ? this.getCurrentRoundProgressHistory(license)
+      : [];
+    return this.resolveStatusAfterStepsChange(steps, currentStatus, roundHist);
+  },
+
   isRenewalStepsComplete(license) {
     const steps = license?.steps || [];
     if (!steps.length) return false;
     const last = steps[steps.length - 1];
-    if (license.status === last) return true;
-    const hist = license.history || [];
+    const hist = this.getCurrentRoundProgressHistory(license);
+    if (license.status === last && hist.some(h => h.action === last)) return true;
     return steps.every(s => hist.some(h => h.action === s));
   },
 

@@ -457,10 +457,17 @@ var SheetService = (function () {
     var ready = status === lastStep;
     if (!ready && lastStep) {
       var hist = readTable_(CONFIG.SHEETS.HISTORY);
-      var done = {};
+      var licHist = [];
       hist.forEach(function (h) {
-        if (String(h.licenseId) === String(licenseId)) done[h.action] = true;
+        if (String(h.licenseId) === String(licenseId)) licHist.push(h);
       });
+      var lastStartIdx = -1;
+      licHist.forEach(function (h, idx) {
+        if (h.action === 'เริ่มรอบติดตามใหม่') lastStartIdx = idx;
+      });
+      var progressHist = lastStartIdx >= 0 ? licHist.slice(lastStartIdx + 1) : licHist;
+      var done = {};
+      progressHist.forEach(function (h) { if (h.action) done[h.action] = true; });
       ready = steps.every(function (s) { return done[s]; });
     }
     if (!ready) {
