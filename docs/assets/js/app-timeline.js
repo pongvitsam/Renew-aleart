@@ -88,6 +88,7 @@ function renderTimeline(projectId, licenseId) {
   document.getElementById('update-license-id').value = license.id;
 
   TimelineUI.render(license);
+  RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
 
   const select = document.getElementById('update-step');

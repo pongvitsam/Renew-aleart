@@ -45,7 +45,7 @@ const licenseModal = modal('licenseModal', 'max-w-xl', `
 const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 <${d} class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white font-bold flex justify-between items-center"><span><i class="fa-solid fa-list-check mr-2"></i><span id="timelineModalTitle">ขั้นตอนใบอนุญาต</span></span><button type="button" onclick="closeModal('timelineModal')" class="w-8 h-8 rounded-lg bg-white/20"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
-<${d} class="md:w-1/2 p-5 overflow-y-auto border-r bg-slate-50 custom-scrollbar"><h4 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ขั้นตอนดำเนินการ</h4><${d} id="timeline-container" class="pr-2"></${d}></${d}>
+<${d} class="md:w-1/2 p-5 overflow-y-auto border-r bg-slate-50 custom-scrollbar"><h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ขั้นตอนดำเนินการ</h4><${d} id="timeline-container" class="pr-2 mb-4"></${d}><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 border-t pt-4"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>
 <${d} class="md:w-1/2 flex flex-col">
 <${d} class="p-4 border-b bg-white"><input type="hidden" id="update-license-id">
 <label class="text-xs font-bold text-slate-600 block mb-1">อัปเดตขั้นตอน<select id="update-step" class="w-full border rounded-xl p-2.5 text-sm mt-1"></select></label>
@@ -104,21 +104,22 @@ const html = [
   timelineModal,
   testModal,
   departmentModal,
-  '<script src="/Renew-aleart/assets/js/config.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-cache.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/utils.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-mutations.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/api.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-index.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-state.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-departments.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-sidebar.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-calendar.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-timeline.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-dashboard.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-project.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-modals.js?v=9"></script>',
-  '<script src="/Renew-aleart/assets/js/app-main.js?v=9"></script>',
+  '<script src="/Renew-aleart/assets/js/config.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-cache.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/utils.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-mutations.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/api.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-index.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-state.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-departments.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-sidebar.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-calendar.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-timeline.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-renewal.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-dashboard.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-project.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-modals.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/app-main.js?v=10"></script>',
   '</body></html>'
 ].join('');
 

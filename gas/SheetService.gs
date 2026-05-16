@@ -16,7 +16,7 @@ var SheetService = (function () {
     ]);
     ensureSheet_(ss, CONFIG.SHEETS.LICENSES, [
       'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
-      'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
+      'driveUrl', 'status', 'steps', 'renewalCycles', 'createdAt', 'updatedAt'
     ]);
     ensureSheet_(ss, CONFIG.SHEETS.HISTORY, [
       'id', 'licenseId', 'date', 'action', 'note', 'createdAt'
@@ -43,6 +43,13 @@ var SheetService = (function () {
     }
     if (!ss.getSheetByName(CONFIG.SHEETS.DEPARTMENTS)) {
       ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
+    }
+    var lic = ss.getSheetByName(CONFIG.SHEETS.LICENSES);
+    if (lic && lic.getLastRow() > 0) {
+      var lh = lic.getRange(1, 1, 1, lic.getLastColumn()).getValues()[0];
+      if (lh.indexOf('renewalCycles') === -1) {
+        lic.getRange(1, lh.length + 1).setValue('renewalCycles');
+      }
     }
   }
 
@@ -120,6 +127,8 @@ var SheetService = (function () {
     licenseRows.forEach(function (l) {
       var pid = String(l.projectId);
       if (!licensesByProject[pid]) licensesByProject[pid] = [];
+      var cycles = parseJson_(l.renewalCycles, []);
+      cycles.sort(function (a, b) { return (a.round || 0) - (b.round || 0); });
       licensesByProject[pid].push({
         id: Number(l.id),
         name: l.name,
@@ -129,6 +138,7 @@ var SheetService = (function () {
         driveUrl: l.driveUrl || '',
         status: l.status || '-',
         steps: parseJson_(l.steps, CONFIG.DEFAULT_STEPS.slice()),
+        renewalCycles: cycles,
         history: historyByLicense[String(l.id)] || []
       });
     });
@@ -245,6 +255,16 @@ var SheetService = (function () {
   function saveLicense(data) {
     var steps = data.steps || CONFIG.DEFAULT_STEPS;
     var id = data.id ? Number(data.id) : null;
+    var existingCycles = '[]';
+    if (id) {
+      var licRows = readTable_(CONFIG.SHEETS.LICENSES);
+      for (var li = 0; li < licRows.length; li++) {
+        if (Number(licRows[li].id) === id) {
+          existingCycles = licRows[li].renewalCycles || '[]';
+          break;
+        }
+      }
+    }
     var newId = upsertRow_(CONFIG.SHEETS.LICENSES, id, {
       id: id || '',
       projectId: data.projectId,
@@ -255,10 +275,11 @@ var SheetService = (function () {
       driveUrl: data.driveUrl || '',
       status: data.status || 'รอเริ่มดำเนินการ',
       steps: JSON.stringify(steps),
+      renewalCycles: data.renewalCycles !== undefined ? data.renewalCycles : existingCycles,
       createdAt: ''
     }, [
       'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
-      'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
+      'driveUrl', 'status', 'steps', 'renewalCycles', 'createdAt', 'updatedAt'
     ]);
     invalidateCache_();
     return { success: true, id: newId };
@@ -296,6 +317,87 @@ var SheetService = (function () {
     return { success: true };
   }
 
+  function getLicenseRow_(licenseId) {
+    var rows = readTable_(CONFIG.SHEETS.LICENSES);
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i].id) === String(licenseId)) return rows[i];
+    }
+    return null;
+  }
+
+  function completeRenewal(data) {
+    var licenseId = data.licenseId;
+    var newIssue = data.issueDate;
+    var newExpiry = data.expiryDate;
+    var note = (data.note || '').trim();
+    if (!licenseId) throw new Error('ไม่พบใบอนุญาต');
+    if (!newIssue || !newExpiry) throw new Error('กรุณากรอกวันเริ่มและวันหมดอายุรอบถัดไป');
+
+    var lic = getLicenseRow_(licenseId);
+    if (!lic) throw new Error('ไม่พบใบอนุญาต');
+
+    var steps = parseJson_(lic.steps, CONFIG.DEFAULT_STEPS.slice());
+    var lastStep = steps.length ? steps[steps.length - 1] : '';
+    var status = String(lic.status || '');
+    var ready = status === lastStep;
+    if (!ready && lastStep) {
+      var hist = readTable_(CONFIG.SHEETS.HISTORY);
+      var done = {};
+      hist.forEach(function (h) {
+        if (String(h.licenseId) === String(licenseId)) done[h.action] = true;
+      });
+      ready = steps.every(function (s) { return done[s]; });
+    }
+    if (!ready) {
+      throw new Error('ยังดำเนินการขั้นตอนไม่ครบ — บันทึกขั้นตอน "เสร็จสิ้นสมบูรณ์" ก่อนเริ่มรอบใหม่');
+    }
+
+    var cycles = parseJson_(lic.renewalCycles, []);
+    var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    var oldIssue = formatDateValue_(lic.issueDate);
+    var oldExpiry = formatDateValue_(lic.expiryDate);
+    if (oldIssue && oldExpiry) {
+      cycles.push({
+        round: cycles.length + 1,
+        issueDate: oldIssue,
+        expiryDate: oldExpiry,
+        archivedAt: today,
+        note: note || 'บันทึกรอบต่ออายุ'
+      });
+    }
+
+    var firstStep = steps[0] || 'รอเริ่มดำเนินการ';
+    upsertRow_(CONFIG.SHEETS.LICENSES, Number(licenseId), {
+      id: licenseId,
+      projectId: lic.projectId,
+      name: lic.name,
+      issueDate: newIssue,
+      expiryDate: newExpiry,
+      alertMonths: lic.alertMonths,
+      driveUrl: lic.driveUrl || '',
+      status: firstStep,
+      steps: lic.steps,
+      renewalCycles: JSON.stringify(cycles),
+      createdAt: lic.createdAt
+    }, [
+      'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+      'driveUrl', 'status', 'steps', 'renewalCycles', 'createdAt', 'updatedAt'
+    ]);
+
+    var sheet = ensureInitialized().getSheetByName(CONFIG.SHEETS.HISTORY);
+    sheet.appendRow([
+      Date.now(),
+      licenseId,
+      today,
+      'เริ่มรอบติดตามใหม่',
+      'รอบที่ ' + (cycles.length + 1) + ' · ' + newIssue + ' ถึง ' + newExpiry + (note ? ' · ' + note : ''),
+      new Date().toISOString()
+    ]);
+
+    invalidateCache_();
+    return { success: true, licenseId: licenseId, round: cycles.length + 1 };
+  }
+
   function addHistoryEntry(licenseId, action, note) {
     appendRow_(CONFIG.SHEETS.HISTORY, {
       id: Date.now(),
@@ -315,6 +417,7 @@ var SheetService = (function () {
     saveProject: saveProject,
     saveLicense: saveLicense,
     saveTimelineUpdate: saveTimelineUpdate,
+    completeRenewal: completeRenewal,
     addHistoryEntry: addHistoryEntry,
     readTable_: readTable_,
     appendRow_: appendRow_,

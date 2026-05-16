@@ -27,7 +27,7 @@ function doPost(e) {
 function routeAction_(action, data) {
   switch (action) {
     case 'ping':
-      return { success: true, message: 'Renew Aleart API', version: '1.2.0' };
+      return { success: true, message: 'Renew Aleart API', version: '1.3.0' };
     case 'getProjects': {
       var p = SheetService.getPayload();
       return { success: true, projects: p.projects, departments: p.departments };
@@ -43,6 +43,10 @@ function routeAction_(action, data) {
     case 'saveTimelineUpdate':
       SheetService.saveTimelineUpdate(data);
       return { success: true, licenseId: data.licenseId };
+    case 'completeRenewal': {
+      var renewal = SheetService.completeRenewal(data);
+      return { success: true, licenseId: renewal.licenseId, round: renewal.round };
+    }
     case 'saveDepartment':
       DepartmentService.saveDepartment(data);
       return { success: true };

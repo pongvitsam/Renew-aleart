@@ -116,9 +116,11 @@ function buildLicenseCard(project, l) {
 
   const top = document.createElement('header');
   top.className = 'p-5 border-b relative';
+  const rounds = Utils.renewalRoundCount(l);
   top.innerHTML =
     '<h4 class="text-lg font-bold pr-24">' + Utils.escapeHtml(l.name) + '</h4>' +
-    '<p class="text-xs text-slate-500 mt-1">ขั้นตอน: <b class="text-purple-600">' + Utils.escapeHtml(l.status || 'ยังไม่เริ่ม') + '</b></p>' +
+    '<p class="text-xs text-slate-500 mt-1">ขั้นตอน: <b class="text-purple-600">' + Utils.escapeHtml(l.status || 'ยังไม่เริ่ม') + '</b>' +
+    (rounds ? ' · <span class="text-indigo-600">ต่อแล้ว ' + rounds + ' รอบ</span>' : '') + '</p>' +
     '<span class="absolute top-4 right-4 status-pill ' + st.status + '">' + st.text + '</span>';
   card.append(top);
 

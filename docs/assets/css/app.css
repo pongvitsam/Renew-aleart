@@ -214,6 +214,20 @@ body {
 .timeline-step.done .timeline-body { border-color: #a7f3d0; background: #ecfdf5; }
 .timeline-step.current .timeline-body { border-color: #c7d2fe; background: #eef2ff; }
 
+.renewal-round-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-left: 3px solid #6366f1;
+  border-radius: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.renewal-current {
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08);
+}
+
 .log-item {
   border-left: 3px solid var(--primary);
   background: white;

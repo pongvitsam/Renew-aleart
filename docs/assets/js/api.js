@@ -94,6 +94,12 @@ const Api = {
     return res;
   },
 
+  async completeRenewal(data) {
+    const res = await this.call('completeRenewal', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
   async sendTestEmail(data) {
     const res = await this.call('sendTestEmail', data, { skipCache: true });
     this.scheduleBackgroundRefresh();

@@ -175,6 +175,19 @@
     return this.isDriveUrl(project?.driveUrl) ? String(project.driveUrl).trim() : '';
   },
 
+  isRenewalStepsComplete(license) {
+    const steps = license?.steps || [];
+    if (!steps.length) return false;
+    const last = steps[steps.length - 1];
+    if (license.status === last) return true;
+    const hist = license.history || [];
+    return steps.every(s => hist.some(h => h.action === s));
+  },
+
+  renewalRoundCount(license) {
+    return (license?.renewalCycles || []).length;
+  },
+
   buildDriveOpenControl(project, opts) {
     opts = opts || {};
     const url = this.getProjectDriveUrl(project);

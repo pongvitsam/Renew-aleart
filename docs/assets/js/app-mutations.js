@@ -45,6 +45,7 @@ const Mutations = {
       driveUrl: '',
       status: data.status || 'รอเริ่มดำเนินการ',
       steps: data.steps || [],
+      renewalCycles: [],
       history: []
     };
     if (!p.licenses) p.licenses = [];
@@ -71,6 +72,41 @@ const Mutations = {
     });
     if (found) this.persist();
     return found;
+  },
+
+  completeRenewalLocal(licenseId, issueDate, expiryDate, note) {
+    let license = null;
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) !== Number(licenseId)) return;
+        license = l;
+        const oldIssue = l.issueDate;
+        const oldExpiry = l.expiryDate;
+        if (oldIssue && oldExpiry) {
+          if (!l.renewalCycles) l.renewalCycles = [];
+          l.renewalCycles.push({
+            round: l.renewalCycles.length + 1,
+            issueDate: oldIssue,
+            expiryDate: oldExpiry,
+            archivedAt: new Date().toISOString().slice(0, 10),
+            note: note || 'บันทึกรอบต่ออายุ'
+          });
+        }
+        l.issueDate = issueDate;
+        l.expiryDate = expiryDate;
+        const first = (l.steps && l.steps[0]) || 'รอเริ่มดำเนินการ';
+        l.status = first;
+        if (!l.history) l.history = [];
+        l.history.push({
+          id: Date.now(),
+          date: new Date().toISOString().slice(0, 10),
+          action: 'เริ่มรอบติดตามใหม่',
+          note: 'รอบที่ ' + (l.renewalCycles.length + 1) + ' · ' + issueDate + ' ถึง ' + expiryDate
+        });
+      });
+    });
+    if (license) this.persist();
+    return license;
   }
 };
 
