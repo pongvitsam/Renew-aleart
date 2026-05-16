@@ -23,9 +23,15 @@ var DepartmentService = (function () {
   function getDepartments() {
     seedDefaultsIfEmpty_();
     var rows = SheetService.readTable_(CONFIG.SHEETS.DEPARTMENTS);
+    var projects = SheetService.readTable_(CONFIG.SHEETS.PROJECTS);
+    var countByDept = {};
+    projects.forEach(function (p) {
+      var d = String(p.department || '');
+      countByDept[d] = (countByDept[d] || 0) + 1;
+    });
     return rows.map(function (r) {
       var name = String(r.name);
-      var count = countProjectsByDepartment_(name);
+      var count = countByDept[name] || 0;
       return {
         id: Number(r.id),
         name: name,

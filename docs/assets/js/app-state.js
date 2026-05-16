@@ -13,15 +13,21 @@ function applyServerData(res) {
 
 async function loadProjects() {
   Utils.setLoading(true);
+  const safety = setTimeout(() => Utils.setLoading(false), Api.TIMEOUT_MS + 2000);
   try {
     const res = await Api.getProjects();
     applyServerData(res);
     hideSetupBanner();
+    if (!App.projects.length) {
+      showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
+    }
   } catch (err) {
     App.projects = [];
     App.departments = [];
     showSetupBanner(err.message);
+    showDashboard();
   } finally {
+    clearTimeout(safety);
     Utils.setLoading(false);
   }
 }

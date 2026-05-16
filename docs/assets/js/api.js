@@ -1,4 +1,21 @@
 const Api = {
+  TIMEOUT_MS: 45000,
+
+  async fetchWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), this.TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('API ใช้เวลานานเกินไป — ลอง Deploy Web App เวอร์ชันใหม่ใน Apps Script');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   async call(action, data = {}) {
     if (typeof CONFIG === 'undefined') {
       throw new Error('โหลด config.js ไม่สำเร็จ — ลอง Ctrl+F5');
@@ -8,7 +25,7 @@ const Api = {
       throw new Error('ยังไม่ได้ตั้งค่า API_URL ใน config.js');
     }
 
-    const response = await fetch(apiUrl, {
+    const response = await this.fetchWithTimeout(apiUrl, {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -16,11 +33,15 @@ const Api = {
     });
 
     const text = await response.text();
+    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
+      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version) หลัง clasp push');
+    }
+
     let json;
     try {
       json = JSON.parse(text);
     } catch {
-      throw new Error('ตอบกลับจาก API ไม่ถูกต้อง — Deploy Web App ใหม่หลัง clasp push');
+      throw new Error('ตอบกลับจาก API ไม่ถูกต้อง: ' + text.substring(0, 80));
     }
 
     if (json.success === false) {

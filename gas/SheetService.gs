@@ -46,16 +46,19 @@ var SheetService = (function () {
     }
   }
 
-  function ensureInitialized() {
+  function openSs_() {
     var ss = getSpreadsheet_();
     initSheets_(ss);
     migrateSheets_(ss);
-    DepartmentService.seedDefaultsIfEmpty_();
     return ss;
   }
 
+  function ensureInitialized() {
+    return openSs_();
+  }
+
   function readTable_(sheetName) {
-    var ss = ensureInitialized();
+    var ss = openSs_();
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet || sheet.getLastRow() < 2) return [];
     var data = sheet.getDataRange().getValues();
