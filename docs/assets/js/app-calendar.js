@@ -21,7 +21,8 @@ function renderCalendarPanel(container) {
   titleEl.className = 'text-lg font-bold';
   const sub = document.createElement('p');
   sub.className = 'text-xs opacity-80';
-  sub.textContent = 'ปฏิทินหมดอายุใบอนุญาต (พ.ศ.)';
+  sub.id = 'cal-subtitle';
+  sub.textContent = 'ปฏิทินหมดอายุใบอนุญาต';
   center.append(titleEl, sub);
 
   const next = document.createElement('button');
@@ -66,6 +67,8 @@ function paintCalendarDays() {
   if (!title || !grid) return;
 
   title.textContent = Utils.formatMonthYear(App.calYear, App.calMonth);
+  const sub = document.getElementById('cal-subtitle');
+  if (sub) sub.textContent = 'พ.ศ. ' + Utils.toBE(App.calYear) + ' · คลิกรายการเพื่อเปิดโครงการ';
 
   const first = new Date(App.calYear, App.calMonth, 1);
   const startDow = first.getDay();
@@ -105,7 +108,11 @@ function makeCalCell(dayNum, otherMonth, events, isToday) {
 
   const num = document.createElement('div');
   num.className = 'cal-day-num';
-  num.innerHTML = String(dayNum) + (isToday ? ' <span>(วันนี้)</span>' : '');
+  if (isToday) {
+    num.innerHTML = String(dayNum) + ' <span class="cal-today-tag">วันนี้</span>';
+  } else {
+    num.textContent = String(dayNum);
+  }
   cell.appendChild(num);
 
   events.slice(0, 3).forEach(ev => {

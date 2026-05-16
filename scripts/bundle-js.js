@@ -11,6 +11,7 @@ const files = [
   'app-state.js',
   'app-departments.js',
   'app-sidebar.js',
+  'app-date-picker.js',
   'app-calendar.js',
   'app-timeline.js',
   'app-renewal.js',

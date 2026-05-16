@@ -24,11 +24,27 @@ const RenewalUI = {
       title.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> ขั้นตอนครบแล้ว — กรอกวันสำหรับรอบติดตามถัดไป';
       formWrap.appendChild(title);
 
+      const hint = document.createElement('p');
+      hint.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-3';
+      hint.textContent = 'เมื่อเริ่มรอบใหม่ ระบบจะลบประวัติขั้นตอนและ log ของรอบเก่าทั้งหมด';
+      formWrap.appendChild(hint);
+
       const grid = document.createElement('div');
-      grid.className = 'grid grid-cols-2 gap-3 mb-3';
-      grid.innerHTML =
-        '<label class="text-xs font-bold">วันเริ่มรอบใหม่ *<input type="date" id="renewal-issue-date" class="w-full border rounded-lg p-2 text-sm mt-1"></label>' +
-        '<label class="text-xs font-bold">วันหมดอายุรอบใหม่ *<input type="date" id="renewal-expiry-date" class="w-full border rounded-lg p-2 text-sm mt-1"></label>';
+      grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3';
+
+      const issueLbl = document.createElement('label');
+      issueLbl.className = 'text-xs font-bold block';
+      issueLbl.innerHTML = '<span class="block mb-1">วันเริ่มรอบใหม่ *</span>';
+      const issueMount = document.createElement('div');
+      issueLbl.appendChild(issueMount);
+
+      const expiryLbl = document.createElement('label');
+      expiryLbl.className = 'text-xs font-bold block';
+      expiryLbl.innerHTML = '<span class="block mb-1">วันหมดอายุรอบใหม่ *</span>';
+      const expiryMount = document.createElement('div');
+      expiryLbl.appendChild(expiryMount);
+
+      grid.append(issueLbl, expiryLbl);
       formWrap.appendChild(grid);
 
       const noteLbl = document.createElement('label');
@@ -42,11 +58,16 @@ const RenewalUI = {
       btn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> บันทึกและเริ่มรอบติดตามใหม่';
       btn.onclick = () => saveCompleteRenewal(license.id);
       formWrap.appendChild(btn);
+
+      panel.appendChild(formWrap);
+
+      ThaiDatePicker.mount(issueMount, { id: 'renewal-issue-date', placeholder: 'เลือกวันเริ่ม' });
+      ThaiDatePicker.mount(expiryMount, { id: 'renewal-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
     } else {
       formWrap.innerHTML =
         '<p class="text-sm text-slate-600"><i class="fa-solid fa-info-circle mr-1"></i> เมื่อบันทึกขั้นตอน <b>เสร็จสิ้นสมบูรณ์</b> ครบแล้ว จึงจะกรอกวันเริ่ม/หมดอายุรอบถัดไปได้</p>';
+      panel.appendChild(formWrap);
     }
-    panel.appendChild(formWrap);
 
     const histTitle = document.createElement('p');
     histTitle.className = 'text-xs font-bold text-slate-600 uppercase mb-2 mt-2';
@@ -77,21 +98,28 @@ const RenewalUI = {
 };
 
 async function saveCompleteRenewal(licenseId) {
-  const issueDate = document.getElementById('renewal-issue-date')?.value;
-  const expiryDate = document.getElementById('renewal-expiry-date')?.value;
+  const issueDate = ThaiDatePicker.getValue('renewal-issue-date');
+  const expiryDate = ThaiDatePicker.getValue('renewal-expiry-date');
   const note = document.getElementById('renewal-note')?.value?.trim() || '';
-  if (!issueDate || !expiryDate) return showToast('กรุณากรอกวันเริ่มและวันหมดอายุรอบใหม่', 'error');
+  if (!issueDate || !expiryDate) return showToast('กรุณาเลือกวันเริ่มและวันหมดอายุรอบใหม่', 'error');
   if (new Date(expiryDate + 'T12:00:00') <= new Date(issueDate + 'T12:00:00')) {
     return showToast('วันหมดอายุต้องหลังวันเริ่ม', 'error');
   }
 
+  if (!confirm('เริ่มรอบติดตามใหม่จะลบประวัติขั้นตอนและ log ของรอบเก่าทั้งหมด\nต้องการดำเนินการต่อหรือไม่?')) {
+    return;
+  }
+
   Mutations.completeRenewalLocal(licenseId, issueDate, expiryDate, note);
-  showToast('บันทึกรอบต่ออายุและเริ่มติดตามรอบใหม่แล้ว');
+  showToast('เริ่มรอบติดตามใหม่ — ล้างประวัติรอบเก่าแล้ว');
   renderTimeline(App.currentProjectId, licenseId);
   renderProjectView(App.currentProjectId);
 
   try {
     await Api.completeRenewal({ licenseId, issueDate, expiryDate, note });
+    const res = await Api.getLicenseDetail(licenseId);
+    if (res.license) Api.mergeLicenseDetail(licenseId, res.license);
+    renderTimeline(App.currentProjectId, licenseId);
   } catch (err) {
     showToast('ซิงค์ไม่สำเร็จ: ' + err.message, 'error');
     Api.refreshInBackground();

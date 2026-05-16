@@ -105,13 +105,13 @@ const Mutations = {
         l.expiryDate = expiryDate;
         const first = (l.steps && l.steps[0]) || 'รอเริ่มดำเนินการ';
         l.status = first;
-        if (!l.history) l.history = [];
-        l.history.push({
+        l.history = [{
           id: Date.now(),
           date: new Date().toISOString().slice(0, 10),
           action: 'เริ่มรอบติดตามใหม่',
-          note: 'รอบที่ ' + (l.renewalCycles.length + 1) + ' · ' + issueDate + ' ถึง ' + expiryDate
-        });
+          note: 'รอบที่ ' + (l.renewalCycles.length + 1) + ' · ' + issueDate + ' ถึง ' + expiryDate +
+            (note ? ' · ' + note : '')
+        }];
       });
     });
     if (license) this.persist();

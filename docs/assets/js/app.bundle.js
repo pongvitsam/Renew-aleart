@@ -394,13 +394,13 @@ const Mutations = {
         l.expiryDate = expiryDate;
         const first = (l.steps && l.steps[0]) || 'รอเริ่มดำเนินการ';
         l.status = first;
-        if (!l.history) l.history = [];
-        l.history.push({
+        l.history = [{
           id: Date.now(),
           date: new Date().toISOString().slice(0, 10),
           action: 'เริ่มรอบติดตามใหม่',
-          note: 'รอบที่ ' + (l.renewalCycles.length + 1) + ' · ' + issueDate + ' ถึง ' + expiryDate
-        });
+          note: 'รอบที่ ' + (l.renewalCycles.length + 1) + ' · ' + issueDate + ' ถึง ' + expiryDate +
+            (note ? ' · ' + note : '')
+        }];
       });
     });
     if (license) this.persist();
@@ -1016,6 +1016,215 @@ function renderSidebar(light) {
 
 window.renderSidebar = renderSidebar;
 
+/* app-date-picker.js */
+/**
+ * ปฏิทินเลือกวัน — เดือน/ปี ไทย พ.ศ.
+ */
+const ThaiDatePicker = {
+  _map: {},
+
+  parseIso(iso) {
+    if (!iso) return null;
+    const d = new Date(iso + 'T12:00:00');
+    return isNaN(d.getTime()) ? null : d;
+  },
+
+  toIso(d) {
+    if (!d) return '';
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+  },
+
+  mount(host, options) {
+    const id = options.id;
+    if (!host || !id) return null;
+
+    const initial = this.parseIso(options.value || '');
+    const state = {
+      viewYear: initial ? initial.getFullYear() : new Date().getFullYear(),
+      viewMonth: initial ? initial.getMonth() : new Date().getMonth(),
+      selected: initial
+    };
+
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.id = id;
+    hidden.value = options.value || '';
+
+    const root = document.createElement('div');
+    root.className = 'thai-dp';
+
+    const display = document.createElement('button');
+    display.type = 'button';
+    display.className = 'thai-dp-display';
+    display.innerHTML = '<i class="fa-regular fa-calendar-days"></i> <span class="thai-dp-display-text">เลือกวันที่</span>';
+
+    const pop = document.createElement('div');
+    pop.className = 'thai-dp-pop hidden';
+
+    const head = document.createElement('div');
+    head.className = 'thai-dp-head';
+    const prev = document.createElement('button');
+    prev.type = 'button';
+    prev.className = 'thai-dp-nav';
+    prev.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+    const title = document.createElement('p');
+    title.className = 'thai-dp-title';
+    const next = document.createElement('button');
+    next.type = 'button';
+    next.className = 'thai-dp-nav';
+    next.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+    head.append(prev, title, next);
+
+    const dow = document.createElement('div');
+    dow.className = 'thai-dp-dow';
+    ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].forEach(d => {
+      const c = document.createElement('span');
+      c.textContent = d;
+      dow.appendChild(c);
+    });
+
+    const grid = document.createElement('div');
+    grid.className = 'thai-dp-grid';
+
+    const todayBtn = document.createElement('button');
+    todayBtn.type = 'button';
+    todayBtn.className = 'thai-dp-today';
+    todayBtn.textContent = 'วันนี้';
+
+    pop.append(head, dow, grid, todayBtn);
+    pop.onclick = e => e.stopPropagation();
+    root.append(display, pop, hidden);
+    host.replaceChildren(root);
+
+    const updateDisplay = () => {
+      const span = display.querySelector('.thai-dp-display-text');
+      if (state.selected) {
+        span.textContent = Utils.formatDate(ThaiDatePicker.toIso(state.selected));
+        display.classList.add('has-value');
+      } else {
+        span.textContent = options.placeholder || 'เลือกวันที่';
+        display.classList.remove('has-value');
+      }
+    };
+
+    const paint = () => {
+      title.textContent = Utils.formatMonthYear(state.viewYear, state.viewMonth);
+      grid.replaceChildren();
+      const first = new Date(state.viewYear, state.viewMonth, 1);
+      const startDow = first.getDay();
+      const daysInMonth = new Date(state.viewYear, state.viewMonth + 1, 0).getDate();
+      const prevDays = new Date(state.viewYear, state.viewMonth, 0).getDate();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const addCell = (day, other, dateObj) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'thai-dp-day' + (other ? ' other' : '');
+        if (state.selected && dateObj &&
+          dateObj.getFullYear() === state.selected.getFullYear() &&
+          dateObj.getMonth() === state.selected.getMonth() &&
+          dateObj.getDate() === state.selected.getDate()) {
+          btn.classList.add('selected');
+        }
+        if (!other && dateObj && dateObj.getTime() === today.getTime()) btn.classList.add('today');
+        btn.textContent = String(day);
+        if (!other && dateObj) {
+          btn.onclick = () => {
+            state.selected = dateObj;
+            hidden.value = ThaiDatePicker.toIso(dateObj);
+            updateDisplay();
+            pop.classList.add('hidden');
+            if (options.onChange) options.onChange(hidden.value);
+          };
+        }
+        grid.appendChild(btn);
+      };
+
+      for (let i = 0; i < startDow; i++) {
+        const d = prevDays - startDow + i + 1;
+        addCell(d, true, null);
+      }
+      for (let d = 1; d <= daysInMonth; d++) {
+        addCell(d, false, new Date(state.viewYear, state.viewMonth, d));
+      }
+      const total = startDow + daysInMonth;
+      const rem = total % 7 === 0 ? 0 : 7 - (total % 7);
+      for (let i = 1; i <= rem; i++) addCell(i, true, null);
+    };
+
+    display.onclick = (e) => {
+      e.stopPropagation();
+      document.querySelectorAll('.thai-dp-pop').forEach(p => { if (p !== pop) p.classList.add('hidden'); });
+      pop.classList.toggle('hidden');
+      if (!pop.classList.contains('hidden') && state.selected) {
+        state.viewYear = state.selected.getFullYear();
+        state.viewMonth = state.selected.getMonth();
+        paint();
+      }
+    };
+
+    prev.onclick = (e) => {
+      e.stopPropagation();
+      state.viewMonth--;
+      if (state.viewMonth < 0) { state.viewMonth = 11; state.viewYear--; }
+      paint();
+    };
+    next.onclick = (e) => {
+      e.stopPropagation();
+      state.viewMonth++;
+      if (state.viewMonth > 11) { state.viewMonth = 0; state.viewYear++; }
+      paint();
+    };
+    todayBtn.onclick = (e) => {
+      e.stopPropagation();
+      const t = new Date();
+      state.selected = t;
+      state.viewYear = t.getFullYear();
+      state.viewMonth = t.getMonth();
+      hidden.value = ThaiDatePicker.toIso(t);
+      updateDisplay();
+      paint();
+      pop.classList.add('hidden');
+      if (options.onChange) options.onChange(hidden.value);
+    };
+
+    document.addEventListener('click', () => pop.classList.add('hidden'));
+
+    paint();
+    updateDisplay();
+    this._map[id] = { hidden, state, paint, updateDisplay };
+    return this._map[id];
+  },
+
+  getValue(id) {
+    return document.getElementById(id)?.value || '';
+  },
+
+  setValue(id, iso) {
+    const inst = this._map[id];
+    if (!inst) return;
+    inst.state.selected = this.parseIso(iso);
+    if (inst.state.selected) {
+      inst.state.viewYear = inst.state.selected.getFullYear();
+      inst.state.viewMonth = inst.state.selected.getMonth();
+    }
+    inst.hidden.value = iso || '';
+    inst.paint();
+    inst.updateDisplay();
+  },
+
+  mountBySelector(selector, options) {
+    document.querySelectorAll(selector).forEach(el => {
+      const id = el.dataset.inputId || options.id;
+      if (id) this.mount(el, { ...options, id });
+    });
+  }
+};
+
 /* app-calendar.js */
 ﻿App.calYear = new Date().getFullYear();
 App.calMonth = new Date().getMonth();
@@ -1040,7 +1249,8 @@ function renderCalendarPanel(container) {
   titleEl.className = 'text-lg font-bold';
   const sub = document.createElement('p');
   sub.className = 'text-xs opacity-80';
-  sub.textContent = 'ปฏิทินหมดอายุใบอนุญาต (พ.ศ.)';
+  sub.id = 'cal-subtitle';
+  sub.textContent = 'ปฏิทินหมดอายุใบอนุญาต';
   center.append(titleEl, sub);
 
   const next = document.createElement('button');
@@ -1085,6 +1295,8 @@ function paintCalendarDays() {
   if (!title || !grid) return;
 
   title.textContent = Utils.formatMonthYear(App.calYear, App.calMonth);
+  const sub = document.getElementById('cal-subtitle');
+  if (sub) sub.textContent = 'พ.ศ. ' + Utils.toBE(App.calYear) + ' · คลิกรายการเพื่อเปิดโครงการ';
 
   const first = new Date(App.calYear, App.calMonth, 1);
   const startDow = first.getDay();
@@ -1124,7 +1336,11 @@ function makeCalCell(dayNum, otherMonth, events, isToday) {
 
   const num = document.createElement('div');
   num.className = 'cal-day-num';
-  num.innerHTML = String(dayNum) + (isToday ? ' <span>(วันนี้)</span>' : '');
+  if (isToday) {
+    num.innerHTML = String(dayNum) + ' <span class="cal-today-tag">วันนี้</span>';
+  } else {
+    num.textContent = String(dayNum);
+  }
   cell.appendChild(num);
 
   events.slice(0, 3).forEach(ev => {
@@ -1360,11 +1576,27 @@ const RenewalUI = {
       title.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> ขั้นตอนครบแล้ว — กรอกวันสำหรับรอบติดตามถัดไป';
       formWrap.appendChild(title);
 
+      const hint = document.createElement('p');
+      hint.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 mb-3';
+      hint.textContent = 'เมื่อเริ่มรอบใหม่ ระบบจะลบประวัติขั้นตอนและ log ของรอบเก่าทั้งหมด';
+      formWrap.appendChild(hint);
+
       const grid = document.createElement('div');
-      grid.className = 'grid grid-cols-2 gap-3 mb-3';
-      grid.innerHTML =
-        '<label class="text-xs font-bold">วันเริ่มรอบใหม่ *<input type="date" id="renewal-issue-date" class="w-full border rounded-lg p-2 text-sm mt-1"></label>' +
-        '<label class="text-xs font-bold">วันหมดอายุรอบใหม่ *<input type="date" id="renewal-expiry-date" class="w-full border rounded-lg p-2 text-sm mt-1"></label>';
+      grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3';
+
+      const issueLbl = document.createElement('label');
+      issueLbl.className = 'text-xs font-bold block';
+      issueLbl.innerHTML = '<span class="block mb-1">วันเริ่มรอบใหม่ *</span>';
+      const issueMount = document.createElement('div');
+      issueLbl.appendChild(issueMount);
+
+      const expiryLbl = document.createElement('label');
+      expiryLbl.className = 'text-xs font-bold block';
+      expiryLbl.innerHTML = '<span class="block mb-1">วันหมดอายุรอบใหม่ *</span>';
+      const expiryMount = document.createElement('div');
+      expiryLbl.appendChild(expiryMount);
+
+      grid.append(issueLbl, expiryLbl);
       formWrap.appendChild(grid);
 
       const noteLbl = document.createElement('label');
@@ -1378,11 +1610,16 @@ const RenewalUI = {
       btn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> บันทึกและเริ่มรอบติดตามใหม่';
       btn.onclick = () => saveCompleteRenewal(license.id);
       formWrap.appendChild(btn);
+
+      panel.appendChild(formWrap);
+
+      ThaiDatePicker.mount(issueMount, { id: 'renewal-issue-date', placeholder: 'เลือกวันเริ่ม' });
+      ThaiDatePicker.mount(expiryMount, { id: 'renewal-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
     } else {
       formWrap.innerHTML =
         '<p class="text-sm text-slate-600"><i class="fa-solid fa-info-circle mr-1"></i> เมื่อบันทึกขั้นตอน <b>เสร็จสิ้นสมบูรณ์</b> ครบแล้ว จึงจะกรอกวันเริ่ม/หมดอายุรอบถัดไปได้</p>';
+      panel.appendChild(formWrap);
     }
-    panel.appendChild(formWrap);
 
     const histTitle = document.createElement('p');
     histTitle.className = 'text-xs font-bold text-slate-600 uppercase mb-2 mt-2';
@@ -1413,21 +1650,28 @@ const RenewalUI = {
 };
 
 async function saveCompleteRenewal(licenseId) {
-  const issueDate = document.getElementById('renewal-issue-date')?.value;
-  const expiryDate = document.getElementById('renewal-expiry-date')?.value;
+  const issueDate = ThaiDatePicker.getValue('renewal-issue-date');
+  const expiryDate = ThaiDatePicker.getValue('renewal-expiry-date');
   const note = document.getElementById('renewal-note')?.value?.trim() || '';
-  if (!issueDate || !expiryDate) return showToast('กรุณากรอกวันเริ่มและวันหมดอายุรอบใหม่', 'error');
+  if (!issueDate || !expiryDate) return showToast('กรุณาเลือกวันเริ่มและวันหมดอายุรอบใหม่', 'error');
   if (new Date(expiryDate + 'T12:00:00') <= new Date(issueDate + 'T12:00:00')) {
     return showToast('วันหมดอายุต้องหลังวันเริ่ม', 'error');
   }
 
+  if (!confirm('เริ่มรอบติดตามใหม่จะลบประวัติขั้นตอนและ log ของรอบเก่าทั้งหมด\nต้องการดำเนินการต่อหรือไม่?')) {
+    return;
+  }
+
   Mutations.completeRenewalLocal(licenseId, issueDate, expiryDate, note);
-  showToast('บันทึกรอบต่ออายุและเริ่มติดตามรอบใหม่แล้ว');
+  showToast('เริ่มรอบติดตามใหม่ — ล้างประวัติรอบเก่าแล้ว');
   renderTimeline(App.currentProjectId, licenseId);
   renderProjectView(App.currentProjectId);
 
   try {
     await Api.completeRenewal({ licenseId, issueDate, expiryDate, note });
+    const res = await Api.getLicenseDetail(licenseId);
+    if (res.license) Api.mergeLicenseDetail(licenseId, res.license);
+    renderTimeline(App.currentProjectId, licenseId);
   } catch (err) {
     showToast('ซิงค์ไม่สำเร็จ: ' + err.message, 'error');
     Api.refreshInBackground();
@@ -1903,18 +2147,20 @@ async function saveProject() {
 
 function openLicenseModal() {
   document.getElementById('license-name').value = '';
-  document.getElementById('license-issue-date').value = '';
-  document.getElementById('license-expiry-date').value = '';
   document.getElementById('license-alert-months').value = '3';
   document.getElementById('license-steps').value =
     '1. แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง\n2. ขอเอกสารสนับสนุนจากลูกค้า\n3. ได้รับเอกสารครบถ้วน\n4. ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ\n5. แจ้งผลให้ลูกค้าทราบ\n6. เสร็จสิ้นสมบูรณ์';
+  const issueHost = document.getElementById('license-issue-date-mount');
+  const expiryHost = document.getElementById('license-expiry-date-mount');
+  if (issueHost) ThaiDatePicker.mount(issueHost, { id: 'license-issue-date', placeholder: 'เลือกวันที่ออก' });
+  if (expiryHost) ThaiDatePicker.mount(expiryHost, { id: 'license-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
   openModal('licenseModal');
 }
 
 async function saveLicense() {
   const name = document.getElementById('license-name').value.trim();
-  const issueDate = document.getElementById('license-issue-date').value;
-  const expiryDate = document.getElementById('license-expiry-date').value;
+  const issueDate = ThaiDatePicker.getValue('license-issue-date');
+  const expiryDate = ThaiDatePicker.getValue('license-expiry-date');
   const alertMonths = parseInt(document.getElementById('license-alert-months').value, 10) || 3;
   const stepsTxt = document.getElementById('license-steps').value;
   if (!name || !issueDate || !expiryDate) return showToast('กรุณากรอกข้อมูลสำคัญให้ครบ', 'error');

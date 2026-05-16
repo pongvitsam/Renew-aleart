@@ -322,6 +322,114 @@ a.btn-primary[aria-disabled="true"] {
   padding: 2rem 0;
 }
 
+/* Thai date picker */
+.thai-dp { position: relative; }
+.thai-dp-display {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.75rem;
+  background: white;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.thai-dp-display.has-value { color: #1e293b; border-color: #a5b4fc; }
+.thai-dp-display:hover { border-color: #818cf8; }
+.thai-dp-pop {
+  position: absolute;
+  z-index: 80;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  box-shadow: 0 12px 40px -8px rgba(15, 23, 42, 0.2);
+  padding: 0.75rem;
+}
+.thai-dp-pop.hidden { display: none; }
+.thai-dp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+.thai-dp-title {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #4338ca;
+  text-align: center;
+  flex: 1;
+}
+.thai-dp-nav {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: #eef2ff;
+  color: #4f46e5;
+  border: none;
+  cursor: pointer;
+}
+.thai-dp-nav:hover { background: #e0e7ff; }
+.thai-dp-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 4px;
+}
+.thai-dp-dow span {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #94a3b8;
+  padding: 0.2rem 0;
+}
+.thai-dp-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.thai-dp-day {
+  aspect-ratio: 1;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #f8fafc;
+  color: #334155;
+  cursor: pointer;
+}
+.thai-dp-day:hover:not(.other) { background: #eef2ff; color: #4338ca; }
+.thai-dp-day.other { background: transparent; color: #cbd5e1; cursor: default; }
+.thai-dp-day.today { box-shadow: inset 0 0 0 2px #6366f1; }
+.thai-dp-day.selected { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; }
+.thai-dp-today {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+.cal-today-tag {
+  display: block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #4f46e5;
+}
+
 .steps-editor-box {
   background: white;
   border: 1px solid #e2e8f0;

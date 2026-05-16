@@ -87,18 +87,20 @@ async function saveProject() {
 
 function openLicenseModal() {
   document.getElementById('license-name').value = '';
-  document.getElementById('license-issue-date').value = '';
-  document.getElementById('license-expiry-date').value = '';
   document.getElementById('license-alert-months').value = '3';
   document.getElementById('license-steps').value =
     '1. แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง\n2. ขอเอกสารสนับสนุนจากลูกค้า\n3. ได้รับเอกสารครบถ้วน\n4. ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ\n5. แจ้งผลให้ลูกค้าทราบ\n6. เสร็จสิ้นสมบูรณ์';
+  const issueHost = document.getElementById('license-issue-date-mount');
+  const expiryHost = document.getElementById('license-expiry-date-mount');
+  if (issueHost) ThaiDatePicker.mount(issueHost, { id: 'license-issue-date', placeholder: 'เลือกวันที่ออก' });
+  if (expiryHost) ThaiDatePicker.mount(expiryHost, { id: 'license-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
   openModal('licenseModal');
 }
 
 async function saveLicense() {
   const name = document.getElementById('license-name').value.trim();
-  const issueDate = document.getElementById('license-issue-date').value;
-  const expiryDate = document.getElementById('license-expiry-date').value;
+  const issueDate = ThaiDatePicker.getValue('license-issue-date');
+  const expiryDate = ThaiDatePicker.getValue('license-expiry-date');
   const alertMonths = parseInt(document.getElementById('license-alert-months').value, 10) || 3;
   const stepsTxt = document.getElementById('license-steps').value;
   if (!name || !issueDate || !expiryDate) return showToast('กรุณากรอกข้อมูลสำคัญให้ครบ', 'error');

@@ -424,6 +424,22 @@ var SheetService = (function () {
     return null;
   }
 
+  function deleteHistoryForLicense_(licenseId) {
+    var ss = ensureInitialized();
+    var sheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
+    if (!sheet) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    var licCol = headers.indexOf('licenseId') + 1;
+    if (licCol < 1) licCol = 2;
+    for (var r = lastRow; r >= 2; r--) {
+      if (String(sheet.getRange(r, licCol).getValue()) === String(licenseId)) {
+        sheet.deleteRow(r);
+      }
+    }
+  }
+
   function completeRenewal(data) {
     var licenseId = data.licenseId;
     var newIssue = data.issueDate;
@@ -464,6 +480,8 @@ var SheetService = (function () {
         note: note || 'บันทึกรอบต่ออายุ'
       });
     }
+
+    deleteHistoryForLicense_(licenseId);
 
     var firstStep = steps[0] || 'รอเริ่มดำเนินการ';
     upsertRow_(CONFIG.SHEETS.LICENSES, Number(licenseId), {

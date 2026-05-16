@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '15';
+const ASSET_V = '16';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -45,8 +45,8 @@ const licenseModal = modal('licenseModal', 'max-w-xl', `
 <${d} class="p-5 space-y-4 overflow-y-auto flex-1">
 <label class="block text-sm font-bold">ชื่อ *<input id="license-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
 <${d} class="grid grid-cols-2 gap-4">
-<label class="text-sm font-bold">วันที่ออก *<input type="date" id="license-issue-date" class="w-full border rounded-xl p-2 mt-1"></label>
-<label class="text-sm font-bold">หมดอายุ *<input type="date" id="license-expiry-date" class="w-full border rounded-xl p-2 mt-1"></label></${d}>
+<label class="text-sm font-bold block">วันที่ออก *<${d} id="license-issue-date-mount" class="mt-1"></${d}></label>
+<label class="text-sm font-bold block">หมดอายุ *<${d} id="license-expiry-date-mount" class="mt-1"></${d}></label></${d}>
 <label class="text-sm font-bold">แจ้งเตือน (เดือน)<input type="number" id="license-alert-months" min="1" value="3" class="w-full border rounded-xl p-2 mt-1 block w-full max-w-xs"></label>
 <p class="text-xs text-slate-500">ไฟล์ Drive ใช้ลิงก์ของโครงการ — ตั้งในหน้าแก้ไขโครงการ</p>
 <label class="text-sm font-bold">ขั้นตอน<textarea id="license-steps" rows="5" class="w-full border rounded-lg p-2 mt-1 text-sm"></textarea></label>
