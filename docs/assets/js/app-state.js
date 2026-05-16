@@ -5,38 +5,71 @@ const App = {
   currentView: 'dashboard',
   currentProjectId: null,
   activeTestProjectId: null,
-  tempEmails: []
+  tempEmails: [],
+  _syncing: false
 };
 
 function applyServerData(res) {
   Api.applyPayload(res);
 }
 
-async function loadProjects() {
+function onProjectsLoaded(res) {
+  applyServerData(res);
+  hideSetupBanner();
+  if (!App.projects.length) {
+    showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
+  }
+  refreshCurrentView();
+}
+
+function onProjectsLoadError(err) {
+  if (!DataCache.get()) {
+    App.projects = [];
+    App.departments = [];
+    showSetupBanner(err.message || 'โหลดข้อมูลไม่สำเร็จ');
+    refreshCurrentView();
+  }
+}
+
+function loadProjects() {
   const cached = DataCache.get();
   if (cached) {
     applyServerData({ success: true, ...cached });
-    if (App.currentView === 'dashboard') showDashboard();
-  } else {
-    Utils.setLoading(true);
-  }
-  const safety = setTimeout(() => Utils.setLoading(false), Api.TIMEOUT_MS + 2000);
-  try {
-    const res = await Api.getProjects({ skipCache: true });
-    applyServerData(res);
+    refreshCurrentView();
     hideSetupBanner();
-    if (!App.projects.length) {
-      showSetupBanner('ยังไม่มีโครงการ — กด "โหลดข้อมูลทดลอง" หรือสร้างโครงการใหม่');
-    }
-  } catch (err) {
-    App.projects = [];
-    App.departments = [];
-    showSetupBanner(err.message);
-    showDashboard();
-  } finally {
-    clearTimeout(safety);
-    Utils.setLoading(false);
+    App._syncing = true;
+    Api.getProjects({ skipCache: true, background: true })
+      .then(onProjectsLoaded)
+      .catch(onProjectsLoadError)
+      .finally(() => { App._syncing = false; });
+    return;
   }
+
+  showDashboardSkeleton();
+  App._syncing = true;
+  Api.getProjects({ skipCache: true })
+    .then(onProjectsLoaded)
+    .catch(onProjectsLoadError)
+    .finally(() => { App._syncing = false; });
+}
+
+function showDashboardSkeleton() {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'page-skeleton';
+  const grid = document.createElement('div');
+  grid.className = 'skeleton-grid';
+  for (let i = 0; i < 4; i++) {
+    const b = document.createElement('div');
+    b.className = 'skeleton-block';
+    grid.appendChild(b);
+  }
+  const msg = document.createElement('p');
+  msg.className = 'text-center text-slate-500 text-sm py-8';
+  msg.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลดข้อมูล...';
+  wrap.append(grid, msg);
+  main.replaceChildren(wrap);
 }
 
 function showSetupBanner(msg) {

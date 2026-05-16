@@ -31,7 +31,7 @@ var EmailService = (function () {
   }
 
   function sendTestEmail(data) {
-    var projects = SheetService.getAllData();
+    var projects = SheetService.getAllData(false);
     var project = null;
     var license = null;
 
@@ -77,7 +77,7 @@ var EmailService = (function () {
   }
 
   function checkAndSendExpiryAlerts() {
-    var projects = SheetService.getAllData();
+    var projects = SheetService.getAllData(false);
     var today = new Date();
     today.setHours(0, 0, 0, 0);
     var sent = 0;

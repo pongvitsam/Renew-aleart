@@ -1,5 +1,5 @@
 const Api = {
-  TIMEOUT_MS: 25000,
+  TIMEOUT_MS: 12000,
   _refreshTimer: null,
 
   async fetchWithTimeout(url, options) {
@@ -72,8 +72,26 @@ const Api = {
       .catch(() => {});
   },
 
-  getProjects(opts) {
+  getProjects(opts = {}) {
     return this.call('getProjects', {}, opts);
+  },
+
+  getLicenseDetail(licenseId) {
+    return this.call('getLicenseDetail', { licenseId }, { skipCache: true });
+  },
+
+  mergeLicenseDetail(licenseId, detail) {
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) === Number(licenseId)) {
+          l.history = detail.history || [];
+          l.steps = detail.steps || l.steps;
+          l.renewalCycles = detail.renewalCycles || l.renewalCycles;
+          l.status = detail.status || l.status;
+        }
+      });
+    });
+    DataCache.set({ projects: App.projects, departments: App.departments });
   },
 
   async saveProject(data) {

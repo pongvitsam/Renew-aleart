@@ -106,11 +106,7 @@ var SheetService = (function () {
     return p.isDemo === true || p.isDemo === 'true' || String(p.name).indexOf('[ทดลอง]') === 0;
   }
 
-  function getAllData() {
-    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
-    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
-    var historyRows = readTable_(CONFIG.SHEETS.HISTORY);
-
+  function buildHistoryMap_(historyRows) {
     var historyByLicense = {};
     historyRows.forEach(function (h) {
       var lid = String(h.licenseId);
@@ -122,25 +118,39 @@ var SheetService = (function () {
         note: h.note || ''
       });
     });
+    return historyByLicense;
+  }
+
+  function mapLicenseRow_(l, historyByLicense, includeHistory) {
+    var cycles = parseJson_(l.renewalCycles, []);
+    cycles.sort(function (a, b) { return (a.round || 0) - (b.round || 0); });
+    return {
+      id: Number(l.id),
+      name: l.name,
+      issueDate: formatDateValue_(l.issueDate),
+      expiryDate: formatDateValue_(l.expiryDate),
+      alertMonths: Number(l.alertMonths) || 3,
+      driveUrl: l.driveUrl || '',
+      status: l.status || '-',
+      steps: parseJson_(l.steps, CONFIG.DEFAULT_STEPS.slice()),
+      renewalCycles: cycles,
+      history: includeHistory ? (historyByLicense[String(l.id)] || []) : []
+    };
+  }
+
+  function getAllData(includeHistory) {
+    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
+    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
+    var historyByLicense = {};
+    if (includeHistory) {
+      historyByLicense = buildHistoryMap_(readTable_(CONFIG.SHEETS.HISTORY));
+    }
 
     var licensesByProject = {};
     licenseRows.forEach(function (l) {
       var pid = String(l.projectId);
       if (!licensesByProject[pid]) licensesByProject[pid] = [];
-      var cycles = parseJson_(l.renewalCycles, []);
-      cycles.sort(function (a, b) { return (a.round || 0) - (b.round || 0); });
-      licensesByProject[pid].push({
-        id: Number(l.id),
-        name: l.name,
-        issueDate: formatDateValue_(l.issueDate),
-        expiryDate: formatDateValue_(l.expiryDate),
-        alertMonths: Number(l.alertMonths) || 3,
-        driveUrl: l.driveUrl || '',
-        status: l.status || '-',
-        steps: parseJson_(l.steps, CONFIG.DEFAULT_STEPS.slice()),
-        renewalCycles: cycles,
-        history: historyByLicense[String(l.id)] || []
-      });
+      licensesByProject[pid].push(mapLicenseRow_(l, historyByLicense, includeHistory));
     });
 
     return projectRows.map(function (p) {
@@ -156,12 +166,29 @@ var SheetService = (function () {
     });
   }
 
+  function getLicenseDetail(licenseId) {
+    var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
+    var licRow = null;
+    for (var i = 0; i < licenseRows.length; i++) {
+      if (String(licenseRows[i].id) === String(licenseId)) {
+        licRow = licenseRows[i];
+        break;
+      }
+    }
+    if (!licRow) throw new Error('ไม่พบใบอนุญาต');
+
+    var historyRows = readTable_(CONFIG.SHEETS.HISTORY);
+    var historyByLicense = buildHistoryMap_(historyRows);
+    return mapLicenseRow_(licRow, historyByLicense, true);
+  }
+
   function getPayload() {
     var cached = PayloadCache.get();
     if (cached) return cached;
+    var projectRows = readTable_(CONFIG.SHEETS.PROJECTS);
     var payload = {
-      projects: getAllData(),
-      departments: DepartmentService.getDepartments()
+      projects: getAllData(false),
+      departments: DepartmentService.getDepartmentsFromProjectRows_(projectRows)
     };
     PayloadCache.set(payload);
     return payload;
@@ -413,6 +440,7 @@ var SheetService = (function () {
     invalidateCache_: invalidateCache_,
     setupSpreadsheet: setupSpreadsheet,
     getAllData: getAllData,
+    getLicenseDetail: getLicenseDetail,
     getPayload: getPayload,
     saveProject: saveProject,
     saveLicense: saveLicense,

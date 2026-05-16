@@ -58,6 +58,13 @@ const TimelineUI = {
     document.getElementById('log-count').textContent = (license.history?.length || 0) + ' ครั้ง';
     const logBox = document.getElementById('history-log-container');
     logBox.replaceChildren();
+    if (license._historyLoading) {
+      const loading = document.createElement('p');
+      loading.className = 'text-center text-slate-400 text-sm py-6';
+      loading.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังโหลดประวัติ...';
+      logBox.appendChild(loading);
+      return;
+    }
     const list = [...(license.history || [])].reverse();
     if (!list.length) {
       const empty = document.createElement('p');
@@ -79,24 +86,44 @@ const TimelineUI = {
   }
 };
 
-function renderTimeline(projectId, licenseId) {
+async function renderTimeline(projectId, licenseId) {
   const project = App.projects.find(p => p.id === projectId);
-  const license = project?.licenses?.find(l => l.id === licenseId);
+  let license = project?.licenses?.find(l => l.id === licenseId);
   if (!license) return;
 
   document.getElementById('timelineModalTitle').textContent = license.name;
   document.getElementById('update-license-id').value = license.id;
+  openModal('timelineModal');
+  paintTimelineModal(license);
 
+  if (license.history && license.history.length) return;
+
+  license._historyLoading = true;
+  TimelineUI.renderLogs(license);
+  try {
+    const res = await Api.getLicenseDetail(licenseId);
+    if (res.license) {
+      Api.mergeLicenseDetail(licenseId, res.license);
+      license = App.projects.find(p => p.id === projectId)?.licenses?.find(l => l.id === licenseId);
+      if (license) {
+        license._historyLoading = false;
+        paintTimelineModal(license);
+      }
+    }
+  } catch {
+    license._historyLoading = false;
+    TimelineUI.renderLogs(license);
+  }
+}
+
+function paintTimelineModal(license) {
   TimelineUI.render(license);
   RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
-
   const select = document.getElementById('update-step');
   select.replaceChildren();
   select.append(new Option('-- เลือกขั้นตอน --', ''));
   (license.steps || []).forEach(s => select.append(new Option(s, s, false, license.status === s)));
-
-  openModal('timelineModal');
 }
 
 window.renderTimeline = renderTimeline;

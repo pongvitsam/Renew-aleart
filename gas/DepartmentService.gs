@@ -20,12 +20,11 @@ var DepartmentService = (function () {
     return n;
   }
 
-  function getDepartments() {
+  function getDepartmentsFromProjectRows_(projectRows) {
     seedDefaultsIfEmpty_();
     var rows = SheetService.readTable_(CONFIG.SHEETS.DEPARTMENTS);
-    var projects = SheetService.readTable_(CONFIG.SHEETS.PROJECTS);
     var countByDept = {};
-    projects.forEach(function (p) {
+    (projectRows || []).forEach(function (p) {
       var d = String(p.department || '');
       countByDept[d] = (countByDept[d] || 0) + 1;
     });
@@ -39,6 +38,10 @@ var DepartmentService = (function () {
         canDelete: count === 0
       };
     });
+  }
+
+  function getDepartments() {
+    return getDepartmentsFromProjectRows_(SheetService.readTable_(CONFIG.SHEETS.PROJECTS));
   }
 
   function saveDepartment(data) {
@@ -89,6 +92,7 @@ var DepartmentService = (function () {
   }
 
   return {
+    getDepartmentsFromProjectRows_: getDepartmentsFromProjectRows_,
     getDepartments: getDepartments,
     saveDepartment: saveDepartment,
     deleteDepartment: deleteDepartment,

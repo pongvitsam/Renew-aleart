@@ -1,13 +1,14 @@
 const DataCache = {
-  KEY: 'renew_payload_v2',
-  TTL: 300000,
+  KEY: 'renew_payload_v3',
+  TTL: 86400000,
 
   get() {
     try {
-      const raw = sessionStorage.getItem(this.KEY);
+      const raw = localStorage.getItem(this.KEY) || sessionStorage.getItem(this.KEY);
       if (!raw) return null;
       const o = JSON.parse(raw);
       if (Date.now() - o.t > this.TTL) {
+        localStorage.removeItem(this.KEY);
         sessionStorage.removeItem(this.KEY);
         return null;
       }
@@ -16,10 +17,13 @@ const DataCache = {
   },
 
   set(data) {
-    sessionStorage.setItem(this.KEY, JSON.stringify({ t: Date.now(), data }));
+    const blob = JSON.stringify({ t: Date.now(), data });
+    try { localStorage.setItem(this.KEY, blob); } catch { /* quota */ }
+    try { sessionStorage.setItem(this.KEY, blob); } catch { /* ignore */ }
   },
 
   clear() {
+    localStorage.removeItem(this.KEY);
     sessionStorage.removeItem(this.KEY);
   }
 };

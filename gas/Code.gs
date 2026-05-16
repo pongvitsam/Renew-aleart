@@ -32,6 +32,10 @@ function routeAction_(action, data) {
       var p = SheetService.getPayload();
       return { success: true, projects: p.projects, departments: p.departments };
     }
+    case 'getLicenseDetail': {
+      var lic = SheetService.getLicenseDetail(data.licenseId);
+      return { success: true, license: lic };
+    }
     case 'saveProject': {
       var saved = SheetService.saveProject(data);
       return { success: true, id: saved.id };

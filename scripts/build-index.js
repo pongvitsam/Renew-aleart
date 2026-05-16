@@ -1,5 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
+try {
+  execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
+} catch (e) {
+  console.warn('bundle-js skipped:', e.message);
+}
 const d = 'd' + 'iv';
 
 const modal = (id, maxW, inner) =>
@@ -78,11 +84,14 @@ const html = [
   '<!DOCTYPE html><html lang="th"><head>',
   '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
   '<title>Renew Aleart</title>',
-  '<script src="https://cdn.tailwindcss.com"></script>',
-  '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">',
-  '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet">',
+  '<link rel="preconnect" href="https://script.google.com" crossorigin>',
+  '<link rel="dns-prefetch" href="https://script.google.com">',
   '<link rel="stylesheet" href="/Renew-aleart/assets/css/app.css">',
-  '<script>tailwind.config={theme:{extend:{fontFamily:{sans:[\'Inter\',\'Sarabun\',\'sans-serif\']}}}}</script>',
+  '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media=\'all\'">',
+  '<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>',
+  '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet" media="print" onload="this.media=\'all\'">',
+  '<script defer src="https://cdn.tailwindcss.com"></script>',
+  '<script defer>document.addEventListener("DOMContentLoaded",function(){if(window.tailwind)tailwind.config={theme:{extend:{fontFamily:{sans:["Sarabun","sans-serif"]}}}};});</script>',
   '</head><body class="text-slate-800 h-screen flex overflow-hidden">',
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
   `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
@@ -104,22 +113,8 @@ const html = [
   timelineModal,
   testModal,
   departmentModal,
-  '<script src="/Renew-aleart/assets/js/config.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-cache.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/utils.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-mutations.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/api.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-index.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-state.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-departments.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-sidebar.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-calendar.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-timeline.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-renewal.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-dashboard.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-project.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-modals.js?v=10"></script>',
-  '<script src="/Renew-aleart/assets/js/app-main.js?v=10"></script>',
+  '<script src="/Renew-aleart/assets/js/config.js?v=11"></script>',
+  '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=11"></script>',
   '</body></html>'
 ].join('');
 
