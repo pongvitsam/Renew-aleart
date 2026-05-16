@@ -1,6 +1,7 @@
 const App = {
   projects: [],
   departments: [],
+  expiryEvents: [],
   currentView: 'dashboard',
   currentProjectId: null,
   activeTestProjectId: null,
@@ -12,7 +13,8 @@ function applyServerData(res) {
 }
 
 async function loadProjects() {
-  Utils.setLoading(true);
+  const hadCache = !!DataCache.get();
+  if (!hadCache) Utils.setLoading(true);
   const safety = setTimeout(() => Utils.setLoading(false), Api.TIMEOUT_MS + 2000);
   try {
     const res = await Api.getProjects();

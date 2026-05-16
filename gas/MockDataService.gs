@@ -27,16 +27,18 @@ var MockDataService = (function () {
       name: DEMO_PREFIX + 'โครงการก่อสร้างคอนโด The Grand',
       department: 'ก่อสร้างและวิศวกรรม',
       emails: JSON.stringify(['pm@thegrand.com', 'engineer@thegrand.com', 'safety@thegrand.com', 'director@company.com', 'admin@thegrand.com']),
+      driveUrl: 'https://drive.google.com/drive/folders/demo-grand',
       isDemo: 'true'
-    }, ['id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt']);
+    }, ['id', 'name', 'department', 'emails', 'driveUrl', 'isDemo', 'createdAt', 'updatedAt']);
 
     SheetService.appendRow_(CONFIG.SHEETS.PROJECTS, {
       id: p2Id,
       name: DEMO_PREFIX + 'นิติบุคคล อาคาร A',
       department: 'นิติบุคคลอาคารชุด',
       emails: JSON.stringify(['juristic@bldga.com', 'manager@bldga.com']),
+      driveUrl: 'https://drive.google.com/drive/folders/demo-bldga',
       isDemo: 'true'
-    }, ['id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt']);
+    }, ['id', 'name', 'department', 'emails', 'driveUrl', 'isDemo', 'createdAt', 'updatedAt']);
 
     var steps1 = CONFIG.DEFAULT_STEPS.slice();
     SheetService.appendRow_(CONFIG.SHEETS.LICENSES, {
@@ -79,6 +81,7 @@ var MockDataService = (function () {
       }, ['id', 'licenseId', 'date', 'action', 'note', 'createdAt']);
     });
 
+    SheetService.invalidateCache_();
     return { success: true, seeded: true, message: 'เพิ่มข้อมูลทดลองครบทุกฟังก์ชันแล้ว' };
   }
 

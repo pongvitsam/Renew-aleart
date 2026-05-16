@@ -5,18 +5,47 @@ function renderProjectView(projectId) {
     document.getElementById('sidebar').classList.add('-translate-x-full');
     document.getElementById('sidebar-overlay').classList.add('hidden');
   }
-  renderSidebar();
+  renderSidebar(true);
 
   const project = App.projects.find(p => p.id === projectId);
   if (!project) return;
 
+  const pst = Utils.getProjectStatus(project);
   document.getElementById('page-title').innerHTML =
     '<span class="flex items-center gap-3 w-full truncate"><i class="fa-regular fa-building text-indigo-500"></i>' +
     Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) +
-    '<button type="button" onclick="openProjectModal(' + project.id + ')" class="ml-2 text-xs bg-slate-100 px-2 py-1 rounded border">แก้ไข</button></span>';
+    '<span class="status-pill ' + pst.pill + ' ml-1">' + pst.text + '</span>' +
+    '<button type="button" onclick="openProjectModal(' + project.id + ')" class="ml-auto text-xs bg-slate-100 px-2 py-1 rounded border shrink-0">แก้ไข</button></span>';
 
   const content = document.getElementById('main-content');
   content.replaceChildren();
+
+  const driveSection = document.createElement('section');
+  driveSection.className = 'drive-box mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3';
+  if (project.driveUrl) {
+    const info = document.createElement('div');
+    info.innerHTML =
+      '<p class="text-xs font-bold text-blue-800 uppercase mb-1"><i class="fa-brands fa-google-drive mr-1"></i> Google Drive โครงการ</p>' +
+      '<p class="text-sm text-slate-600 truncate max-w-md">' + Utils.escapeHtml(project.driveUrl) + '</p>';
+    const open = document.createElement('a');
+    open.href = project.driveUrl;
+    open.target = '_blank';
+    open.rel = 'noopener';
+    open.className = 'btn-primary text-sm px-4 py-2 inline-flex items-center gap-2 shrink-0';
+    open.innerHTML = '<i class="fa-solid fa-arrow-up-right-from-square"></i> เปิดโฟลเดอร์';
+    driveSection.append(info, open);
+  } else {
+    driveSection.innerHTML =
+      '<div><p class="text-sm font-bold text-slate-700"><i class="fa-brands fa-google-drive mr-2 text-blue-500"></i>ยังไม่มีลิงก์ Google Drive</p>' +
+      '<p class="text-xs text-slate-500 mt-1">กดแก้ไขโครงการเพื่อวาง URL โฟลเดอร์ Drive</p></div>';
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'text-sm font-bold text-indigo-600 border border-indigo-200 bg-white px-4 py-2 rounded-xl';
+    edit.textContent = '+ เพิ่มลิงก์ Drive';
+    edit.onclick = () => openProjectModal(project.id);
+    driveSection.appendChild(edit);
+  }
+  content.appendChild(driveSection);
 
   const header = document.createElement('section');
   header.className = 'bg-white p-5 rounded-2xl shadow-sm border mb-6 flex flex-col md:flex-row gap-4 justify-between';
@@ -47,21 +76,21 @@ function renderProjectView(projectId) {
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
-  addBtn.className = 'bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl';
+  addBtn.className = 'bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 px-6 rounded-xl self-start';
   addBtn.textContent = '+ เพิ่มใบอนุญาต';
   addBtn.onclick = () => openLicenseModal();
   header.append(emailWrap, addBtn);
   content.append(header);
 
   const title = document.createElement('h3');
-  title.className = 'text-xl font-bold mb-4';
-  title.textContent = 'ใบอนุญาตในโครงการ';
+  title.className = 'text-xl font-bold mb-4 flex items-center gap-2';
+  title.innerHTML = '<i class="fa-solid fa-file-contract text-emerald-500"></i> ใบอนุญาตในโครงการ';
   content.append(title);
 
   const grid = document.createElement('div');
   grid.className = 'grid grid-cols-1 lg:grid-cols-2 gap-5';
   const licenses = project.licenses || [];
-  if (licenses.length === 0) {
+  if (!licenses.length) {
     const empty = document.createElement('p');
     empty.className = 'col-span-full text-center py-12 text-slate-400 bg-white rounded-2xl border border-dashed';
     empty.textContent = 'ยังไม่มีใบอนุญาตในโครงการนี้';
@@ -75,35 +104,39 @@ function renderProjectView(projectId) {
 function buildLicenseCard(project, l) {
   const st = Utils.calculateStatus(l.expiryDate, l.alertMonths);
   const card = document.createElement('article');
-  card.className = 'bg-white rounded-2xl shadow-sm border flex flex-col';
+  card.className = 'bg-white rounded-2xl shadow-sm border flex flex-col overflow-hidden hover:shadow-md transition-shadow';
 
   const top = document.createElement('header');
-  top.className = 'p-5 border-b';
-  top.innerHTML = '<h4 class="text-lg font-bold pr-20">' + Utils.escapeHtml(l.name) + '</h4>' +
-    '<p class="text-xs text-slate-500">สถานะ: <b class="text-purple-600">' + Utils.escapeHtml(l.status || '-') + '</b></p>' +
-    '<span class="absolute top-4 right-4 text-xs font-bold px-2 py-1 rounded border ' + st.color + '">' + st.text + '</span>';
-  top.style.position = 'relative';
+  top.className = 'p-5 border-b relative';
+  top.innerHTML =
+    '<h4 class="text-lg font-bold pr-24">' + Utils.escapeHtml(l.name) + '</h4>' +
+    '<p class="text-xs text-slate-500 mt-1">ขั้นตอน: <b class="text-purple-600">' + Utils.escapeHtml(l.status || 'ยังไม่เริ่ม') + '</b></p>' +
+    '<span class="absolute top-4 right-4 status-pill ' + st.status + '">' + st.text + '</span>';
   card.append(top);
 
-  const mid = document.createElement('p');
-  mid.className = 'p-4 text-sm grid grid-cols-2 gap-4';
-  mid.innerHTML = '<span>ออก: ' + Utils.formatDate(l.issueDate) + '</span><span>หมดอายุ: ' + Utils.formatDate(l.expiryDate) + '</span>';
+  const mid = document.createElement('div');
+  mid.className = 'p-4 text-sm grid grid-cols-2 gap-4 bg-slate-50/50';
+  mid.innerHTML =
+    '<div><p class="text-[10px] text-slate-400 uppercase">ออก</p><p class="font-semibold">' + Utils.formatDate(l.issueDate) + '</p></div>' +
+    '<div><p class="text-[10px] text-slate-400 uppercase">หมดอายุ</p><p class="font-semibold">' + Utils.formatDate(l.expiryDate) + '</p></div>';
+  mid.innerHTML = mid.innerHTML.replace(/<\/?motion[^>]*>/gi, m => m.startsWith('</') ? '</div>' : '<div>');
   card.append(mid);
 
   const actions = document.createElement('footer');
-  actions.className = 'p-4 border-t flex gap-2';
+  actions.className = 'p-4 border-t flex gap-2 flex-wrap';
   if (l.driveUrl) {
     const a = document.createElement('a');
     a.href = l.driveUrl;
     a.target = '_blank';
-    a.className = 'text-xs bg-blue-50 text-blue-600 px-3 py-2 rounded-lg border';
-    a.textContent = 'Google Drive';
+    a.rel = 'noopener';
+    a.className = 'text-xs bg-blue-50 text-blue-600 px-3 py-2 rounded-lg border font-bold inline-flex items-center gap-1';
+    a.innerHTML = '<i class="fa-brands fa-google-drive"></i> Drive';
     actions.append(a);
   }
   const timelineBtn = document.createElement('button');
   timelineBtn.type = 'button';
-  timelineBtn.className = 'flex-1 bg-slate-800 text-white font-bold py-2 rounded-lg text-sm';
-  timelineBtn.textContent = 'อัปเดตสถานะ/ประวัติ';
+  timelineBtn.className = 'flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm';
+  timelineBtn.innerHTML = '<i class="fa-solid fa-list-check mr-1"></i> ขั้นตอน / ประวัติ';
   timelineBtn.onclick = () => renderTimeline(project.id, l.id);
   actions.append(timelineBtn);
   card.append(actions);

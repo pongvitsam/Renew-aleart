@@ -12,7 +12,7 @@ var SheetService = (function () {
   function initSheets_(ss) {
     ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
     ensureSheet_(ss, CONFIG.SHEETS.PROJECTS, [
-      'id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt'
+      'id', 'name', 'department', 'emails', 'driveUrl', 'isDemo', 'createdAt', 'updatedAt'
     ]);
     ensureSheet_(ss, CONFIG.SHEETS.LICENSES, [
       'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
@@ -37,9 +37,9 @@ var SheetService = (function () {
     var proj = ss.getSheetByName(CONFIG.SHEETS.PROJECTS);
     if (proj && proj.getLastRow() > 0) {
       var h = proj.getRange(1, 1, 1, proj.getLastColumn()).getValues()[0];
-      if (h.indexOf('isDemo') === -1) {
-        proj.getRange(1, h.length + 1).setValue('isDemo');
-      }
+      if (h.indexOf('isDemo') === -1) proj.getRange(1, h.length + 1).setValue('isDemo');
+      h = proj.getRange(1, 1, 1, proj.getLastColumn()).getValues()[0];
+      if (h.indexOf('driveUrl') === -1) proj.getRange(1, h.length + 1).setValue('driveUrl');
     }
     if (!ss.getSheetByName(CONFIG.SHEETS.DEPARTMENTS)) {
       ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
@@ -136,6 +136,7 @@ var SheetService = (function () {
         name: p.name,
         department: p.department || '',
         emails: parseJson_(p.emails, []),
+        driveUrl: p.driveUrl || '',
         isDemo: isDemoRow_(p),
         licenses: licensesByProject[String(p.id)] || []
       };
@@ -143,10 +144,18 @@ var SheetService = (function () {
   }
 
   function getPayload() {
-    return {
+    var cached = PayloadCache.get();
+    if (cached) return cached;
+    var payload = {
       projects: getAllData(),
       departments: DepartmentService.getDepartments()
     };
+    PayloadCache.set(payload);
+    return payload;
+  }
+
+  function invalidateCache_() {
+    PayloadCache.clear();
   }
 
   function formatDateValue_(val) {
@@ -210,9 +219,11 @@ var SheetService = (function () {
       name: name,
       department: department,
       emails: JSON.stringify(emails),
+      driveUrl: data.driveUrl || '',
       isDemo: data.isDemo === true || data.isDemo === 'true' ? 'true' : existingDemo,
       createdAt: ''
-    }, ['id', 'name', 'department', 'emails', 'isDemo', 'createdAt', 'updatedAt']);
+    }, ['id', 'name', 'department', 'emails', 'driveUrl', 'isDemo', 'createdAt', 'updatedAt']);
+    invalidateCache_();
     return { success: true };
   }
 
@@ -234,6 +245,7 @@ var SheetService = (function () {
       'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
       'driveUrl', 'status', 'steps', 'createdAt', 'updatedAt'
     ]);
+    invalidateCache_();
     return { success: true, id: newId };
   }
 
@@ -277,6 +289,7 @@ var SheetService = (function () {
       note,
       new Date().toISOString()
     ]);
+    invalidateCache_();
     return { success: true };
   }
 
@@ -288,9 +301,11 @@ var SheetService = (function () {
       action: action,
       note: note
     }, ['id', 'licenseId', 'date', 'action', 'note', 'createdAt']);
+    invalidateCache_();
   }
 
   return {
+    invalidateCache_: invalidateCache_,
     setupSpreadsheet: setupSpreadsheet,
     getAllData: getAllData,
     getPayload: getPayload,

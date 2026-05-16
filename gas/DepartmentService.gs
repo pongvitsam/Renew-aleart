@@ -55,6 +55,7 @@ var DepartmentService = (function () {
       id: Date.now(),
       name: name
     }, ['id', 'name']);
+    SheetService.invalidateCache_();
     return { success: true };
   }
 
@@ -83,6 +84,7 @@ var DepartmentService = (function () {
         break;
       }
     }
+    SheetService.invalidateCache_();
     return { success: true };
   }
 

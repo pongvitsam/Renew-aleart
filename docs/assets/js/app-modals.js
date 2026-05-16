@@ -40,6 +40,8 @@ function openProjectModal(projectId = null) {
   document.getElementById('project-id').value = '';
   document.getElementById('project-name').value = '';
   document.getElementById('email-input').value = '';
+  const driveEl = document.getElementById('project-drive-url');
+  if (driveEl) driveEl.value = '';
   App.tempEmails = [];
   const title = document.getElementById('projectModalTitle');
   let dept = '';
@@ -51,6 +53,7 @@ function openProjectModal(projectId = null) {
       document.getElementById('project-id').value = project.id;
       document.getElementById('project-name').value = project.name;
       dept = project.department || '';
+      if (driveEl) driveEl.value = project.driveUrl || '';
       App.tempEmails = [...(project.emails || [])];
     }
   } else {
@@ -65,11 +68,12 @@ async function saveProject() {
   const id = document.getElementById('project-id').value;
   const name = document.getElementById('project-name').value.trim();
   const department = document.getElementById('project-department').value;
+  const driveUrl = (document.getElementById('project-drive-url') || {}).value?.trim() || '';
   if (!name || !department) return showToast('กรุณากรอกชื่อและแผนก', 'error');
 
   Utils.setLoading(true);
   try {
-    const res = await Api.saveProject({ id: id || undefined, name, department, emails: App.tempEmails });
+    const res = await Api.saveProject({ id: id || undefined, name, department, emails: App.tempEmails, driveUrl });
     applyServerData(res);
     closeModal('projectModal');
     showToast('บันทึกโครงการสำเร็จ');
@@ -121,44 +125,6 @@ async function saveLicense() {
   } finally {
     Utils.setLoading(false);
   }
-}
-
-function renderTimeline(projectId, licenseId) {
-  const project = App.projects.find(p => p.id === projectId);
-  const license = project?.licenses?.find(l => l.id === licenseId);
-  if (!license) return;
-
-  document.getElementById('timelineModalTitle').textContent = license.name;
-  document.getElementById('update-license-id').value = license.id;
-
-  const container = document.getElementById('timeline-container');
-  container.replaceChildren();
-  (license.steps || []).forEach(step => {
-    const done = (license.history || []).some(h => h.action === step);
-    const current = license.status === step;
-    const row = document.createElement('p');
-    row.className = 'text-sm mb-3 pl-4 border-l-2 ' + (done ? 'border-emerald-500' : current ? 'border-purple-500 font-bold' : 'border-slate-200');
-    row.textContent = (done ? '✓ ' : current ? '● ' : '○ ') + step;
-    container.append(row);
-  });
-
-  const select = document.getElementById('update-step');
-  select.replaceChildren();
-  select.append(new Option('-- ระบุสถานะ/ขั้นตอน --', ''));
-  (license.steps || []).forEach(s => select.append(new Option(s, s, false, license.status === s)));
-
-  document.getElementById('log-count').textContent = (license.history?.length || 0) + ' ครั้ง';
-  const logBox = document.getElementById('history-log-container');
-  logBox.replaceChildren();
-  [...(license.history || [])].reverse().forEach(h => {
-    const item = document.createElement('article');
-    item.className = 'bg-white border p-3 rounded-xl text-sm mb-2';
-    item.innerHTML = '<b>' + Utils.escapeHtml(h.action) + '</b> — ' + Utils.formatDate(h.date) +
-      '<br>' + Utils.escapeHtml(h.note || 'ไม่มีหมายเหตุ');
-    logBox.append(item);
-  });
-
-  openModal('timelineModal');
 }
 
 async function saveTimelineUpdate() {
@@ -238,5 +204,5 @@ async function sendTestEmail() {
 
 Object.assign(window, {
   handleEmailInput, openProjectModal, saveProject, openLicenseModal, saveLicense,
-  renderTimeline, saveTimelineUpdate, openTestEmailModal, updateMockEmailPreview, sendTestEmail
+  saveTimelineUpdate, openTestEmailModal, updateMockEmailPreview, sendTestEmail
 });
