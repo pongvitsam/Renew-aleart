@@ -996,6 +996,7 @@ function renderSidebar(light) {
     const ul = document.createElement('ul');
     ul.className = 'space-y-1';
 
+    projs.sort((a, b) => Utils.compareProjectsByPriority(a, b));
     projs.forEach(project => {
       const st = Utils.getProjectStatus(project);
       const li = document.createElement('li');
@@ -1705,6 +1706,22 @@ window.saveCompleteRenewal = saveCompleteRenewal;
 
 /* app-dashboard.js */
 App.dashboardTab = 'overview';
+App.dashboardStatusFilter = 'all';
+
+const DASHBOARD_STATUS_FILTERS = [
+  { id: 'all', label: 'ทั้งหมด' },
+  { id: 'expired', label: 'หมดอายุ' },
+  { id: 'warning', label: 'ใกล้หมดอายุ' },
+  { id: 'safe', label: 'ปกติ' },
+  { id: 'empty', label: 'ไม่มีใบอนุญาต' }
+];
+
+const DASHBOARD_PRIORITY_GROUPS = [
+  { status: 'expired', label: 'หมดอายุ', icon: 'fa-triangle-exclamation', headerClass: 'text-rose-700 bg-rose-50 border-rose-200', defaultOpen: true },
+  { status: 'warning', label: 'ใกล้หมดอายุ', icon: 'fa-clock', headerClass: 'text-amber-800 bg-amber-50 border-amber-200', defaultOpen: true },
+  { status: 'safe', label: 'ปกติ', icon: 'fa-circle-check', headerClass: 'text-emerald-800 bg-emerald-50 border-emerald-200', defaultOpen: false },
+  { status: 'empty', label: 'ไม่มีใบอนุญาต', icon: 'fa-inbox', headerClass: 'text-slate-600 bg-slate-100 border-slate-200', defaultOpen: false }
+];
 
 function showDashboard() {
   App.currentView = 'dashboard';
@@ -1726,7 +1743,7 @@ function showDashboard() {
     btn.dataset.tab = tab;
     btn.className = 'tab-btn' + (App.dashboardTab === tab ? ' active' : '');
     btn.innerHTML = tab === 'overview'
-      ? '<i class="fa-solid fa-grid-2 mr-1"></i> โครงการ'
+      ? '<i class="fa-solid fa-list mr-1"></i> รายการสถานะ'
       : '<i class="fa-solid fa-calendar-days mr-1"></i> ปฏิทิน';
     btn.onclick = () => { App.dashboardTab = tab; showDashboard(); };
     tabs.appendChild(btn);
@@ -1747,7 +1764,7 @@ function showDashboard() {
   });
 
   const grid = document.createElement('div');
-  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8';
+  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6';
   grid.append(
     makeStatCard(App.projects.length, 'โครงการ', 'fa-building', 'indigo'),
     makeStatCard(totalLics, 'ใบอนุญาต', 'fa-file-contract', 'slate'),
@@ -1756,90 +1773,184 @@ function showDashboard() {
   );
   content.appendChild(grid);
 
-  const sortedProjects = Utils.sortProjectsByPriority(App.projects);
-
-  const hProjects = document.createElement('h3');
-  hProjects.className = 'text-lg font-bold text-slate-800 mb-1 flex items-center gap-2';
-  hProjects.innerHTML = '<i class="fa-solid fa-layer-group text-indigo-500"></i> สถานะทุกโครงการ';
-  content.appendChild(hProjects);
-
-  const hint = document.createElement('p');
-  hint.className = 'text-xs text-slate-500 mb-4';
-  hint.textContent = 'เรียงตามความสำคัญ: หมดอายุ → ใกล้หมดอายุ → ปกติ → ไม่มีใบอนุญาต (#1 = เร่งด่วนที่สุด)';
-  content.appendChild(hint);
-
-  if (!sortedProjects.length) {
-    const empty = document.createElement('p');
-    empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed mb-8';
-    empty.textContent = 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
-    content.appendChild(empty);
-  } else {
-    content.appendChild(renderProjectsByPriority(sortedProjects));
-  }
-
-  const hAlert = document.createElement('h3');
-  hAlert.className = 'text-lg font-bold text-slate-800 mb-4 flex items-center gap-2';
-  hAlert.innerHTML = '<i class="fa-solid fa-bell text-rose-500"></i> แจ้งเตือนด่วน';
-  content.appendChild(hAlert);
-
-  const alerts = [];
-  App.projects.forEach(project => {
-    (project.licenses || []).forEach(license => {
-      const st = Utils.calculateStatus(license.expiryDate, license.alertMonths);
-      if (st.status !== 'safe') alerts.push({ project, license, st });
-    });
-  });
-
-  const list = document.createElement('div');
-  list.className = 'space-y-3';
-  if (!alerts.length) {
-    const ok = document.createElement('p');
-    ok.className = 'text-center py-8 text-emerald-700 bg-emerald-50 rounded-2xl border border-emerald-100';
-    ok.innerHTML = '<i class="fa-solid fa-circle-check mr-2"></i>ไม่มีใบอนุญาตที่ต้องแจ้งเตือน';
-    list.appendChild(ok);
-  } else {
-    alerts.sort(Utils.compareAlertsByPriority.bind(Utils));
-    alerts.forEach(a => list.appendChild(buildAlertRow(a.project, a.license, a.st)));
-  }
-  content.appendChild(list);
+  content.appendChild(buildDashboardToolbar());
+  content.appendChild(renderProjectsStatusList());
 }
 
-const DASHBOARD_PRIORITY_GROUPS = [
-  { status: 'expired', label: 'เร่งด่วน — มีใบอนุญาตหมดอายุ', icon: 'fa-triangle-exclamation', headerClass: 'text-rose-700 bg-rose-50 border-rose-200' },
-  { status: 'warning', label: 'ต้องติดตาม — ใกล้หมดอายุ', icon: 'fa-clock', headerClass: 'text-amber-800 bg-amber-50 border-amber-200' },
-  { status: 'safe', label: 'ปกติ', icon: 'fa-circle-check', headerClass: 'text-emerald-800 bg-emerald-50 border-emerald-200' },
-  { status: 'empty', label: 'ยังไม่มีใบอนุญาต', icon: 'fa-inbox', headerClass: 'text-slate-600 bg-slate-100 border-slate-200' }
-];
+function buildDashboardToolbar() {
+  const bar = document.createElement('div');
+  bar.className = 'dashboard-toolbar';
 
-function renderProjectsByPriority(sortedProjects) {
-  const wrap = document.createElement('div');
-  wrap.className = 'space-y-6 mb-8';
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'dashboard-search-wrap';
+  searchWrap.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i>';
+  const search = document.createElement('input');
+  search.type = 'search';
+  search.id = 'dashboard-project-search';
+  search.className = 'dashboard-search';
+  search.placeholder = 'ค้นหาโครงการ / แผนก...';
+  search.value = App._dashboardSearch || '';
+  search.addEventListener('input', Utils.debounce(e => {
+    App._dashboardSearch = e.target.value;
+    showDashboard();
+  }, 200));
+  searchWrap.appendChild(search);
 
-  let globalRank = 0;
-  DASHBOARD_PRIORITY_GROUPS.forEach(group => {
-    const inGroup = sortedProjects.filter(p => Utils.getProjectStatus(p).status === group.status);
-    if (!inGroup.length) return;
-
-    const section = document.createElement('section');
-    const head = document.createElement('div');
-    head.className = 'flex items-center gap-2 text-sm font-bold px-3 py-2 rounded-xl border mb-3 ' + group.headerClass;
-    head.innerHTML = '<i class="fa-solid ' + group.icon + '"></i> ' + group.label +
-      ' <span class="ml-auto text-xs font-black opacity-70">' + inGroup.length + ' โครงการ</span>';
-    section.appendChild(head);
-
-    const grid = document.createElement('div');
-    grid.className = 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4';
-
-    inGroup.forEach(p => {
-      globalRank += 1;
-      grid.appendChild(buildProjectDashboardCard(p, globalRank));
-    });
-
-    section.appendChild(grid);
-    wrap.appendChild(section);
+  const filters = document.createElement('div');
+  filters.className = 'status-filter-chips';
+  DASHBOARD_STATUS_FILTERS.forEach(f => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'status-filter-chip' + (App.dashboardStatusFilter === f.id ? ' active' : '');
+    chip.textContent = f.label;
+    chip.onclick = () => {
+      App.dashboardStatusFilter = f.id;
+      showDashboard();
+    };
+    filters.appendChild(chip);
   });
 
+  bar.append(searchWrap, filters);
+  return bar;
+}
+
+function getFilteredDashboardProjects() {
+  const term = (App._dashboardSearch || '').trim().toLowerCase();
+  let list = Utils.sortProjectsByPriority([...App.projects]);
+
+  if (App.dashboardStatusFilter !== 'all') {
+    list = list.filter(p => Utils.getProjectStatus(p).status === App.dashboardStatusFilter);
+  }
+
+  if (term) {
+    list = list.filter(p => {
+      const dept = (p.department || '').toLowerCase();
+      return (p.name || '').toLowerCase().includes(term) || dept.includes(term);
+    });
+  }
+
+  return list;
+}
+
+function renderProjectsStatusList() {
+  const wrap = document.createElement('div');
+  wrap.className = 'status-list-wrap';
+
+  const projects = getFilteredDashboardProjects();
+  const summary = document.createElement('p');
+  summary.className = 'text-xs text-slate-500 mb-3';
+  summary.textContent = 'แสดง ' + projects.length + ' โครงการ · มุมมองรายการ (เหมาะกับหลายร้อยโครงการ)';
+  wrap.appendChild(summary);
+
+  if (!projects.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed';
+    empty.textContent = App.projects.length
+      ? 'ไม่พบโครงการตามตัวกรอง'
+      : 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
+    wrap.appendChild(empty);
+    return wrap;
+  }
+
+  if (App.dashboardStatusFilter === 'all') {
+    let globalRank = 0;
+    DASHBOARD_PRIORITY_GROUPS.forEach(group => {
+      const inGroup = projects.filter(p => Utils.getProjectStatus(p).status === group.status);
+      if (!inGroup.length) return;
+      globalRank = appendStatusListSection(wrap, group, inGroup, globalRank);
+    });
+  } else {
+    const group = DASHBOARD_PRIORITY_GROUPS.find(g => g.status === App.dashboardStatusFilter) || {
+      status: App.dashboardStatusFilter,
+      label: DASHBOARD_STATUS_FILTERS.find(f => f.id === App.dashboardStatusFilter)?.label || '',
+      icon: 'fa-list',
+      headerClass: 'text-slate-700 bg-slate-50 border-slate-200',
+      defaultOpen: true
+    };
+    appendStatusListSection(wrap, group, projects, 0);
+  }
+
   return wrap;
+}
+
+function appendStatusListSection(wrap, group, projects, startRank) {
+  const details = document.createElement('details');
+  details.className = 'status-list-section';
+  const autoCollapse = projects.length > 25 && !group.defaultOpen;
+  details.open = group.defaultOpen && !autoCollapse;
+
+  const summary = document.createElement('summary');
+  summary.className = 'status-list-section-head ' + group.headerClass;
+  summary.innerHTML =
+    '<span><i class="fa-solid ' + group.icon + ' mr-2"></i>' + group.label + '</span>' +
+    '<span class="status-list-count">' + projects.length + ' โครงการ</span>';
+  details.appendChild(summary);
+
+  const scroll = document.createElement('div');
+  scroll.className = 'status-list-scroll';
+
+  const table = document.createElement('table');
+  table.className = 'status-list-table';
+  table.innerHTML =
+    '<thead><tr>' +
+    '<th class="col-rank">#</th>' +
+    '<th class="col-name">โครงการ</th>' +
+    '<th class="col-dept">แผนก</th>' +
+    '<th class="col-status">สถานะ</th>' +
+    '<th class="col-lic">ใบอนุญาต</th>' +
+    '<th class="col-urgent">กำหนด</th>' +
+    '<th class="col-drive">Drive</th>' +
+  '</tr></thead>';
+
+  const tbody = document.createElement('tbody');
+  let rank = startRank;
+  projects.forEach(p => {
+    rank += 1;
+    tbody.appendChild(buildProjectListRow(p, rank));
+  });
+  table.appendChild(tbody);
+  scroll.appendChild(table);
+  details.appendChild(scroll);
+  wrap.appendChild(details);
+
+  return rank;
+}
+
+function buildProjectListRow(project, rank) {
+  const st = Utils.getProjectStatus(project);
+  const tr = document.createElement('tr');
+  tr.className = 'status-list-row row-' + st.status;
+  tr.title = 'เปิดโครงการ';
+  tr.onclick = () => renderProjectView(project.id);
+
+  const urgentDays = Utils.nearestUrgentExpiryDays(project);
+  let urgentText = '—';
+  if (urgentDays < 99999 && (st.status === 'expired' || st.status === 'warning')) {
+    urgentText = urgentDays < 0
+      ? 'หมด ' + Math.abs(urgentDays) + ' วัน'
+      : 'อีก ' + urgentDays + ' วัน';
+  }
+
+  const hasDrive = !!Utils.getProjectDriveUrl(project);
+  const licSummary = st.counts.total
+    ? '<span class="lic-dot safe">' + st.counts.safe + '</span>' +
+      '<span class="lic-dot warn">' + st.counts.warning + '</span>' +
+      '<span class="lic-dot exp">' + st.counts.expired + '</span>'
+    : '0';
+
+  tr.innerHTML =
+    '<td class="col-rank" data-label="#">' + rank + '</td>' +
+    '<td class="col-name" data-label="โครงการ"><span class="font-bold text-slate-800">' +
+      Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</span></td>' +
+    '<td class="col-dept" data-label="แผนก">' + Utils.escapeHtml(project.department || '—') + '</td>' +
+    '<td class="col-status" data-label="สถานะ"><span class="status-pill ' + st.pill + '">' + st.text + '</span></td>' +
+    '<td class="col-lic" data-label="ใบอนุญาต"><span class="lic-summary">' + licSummary + '</span></td>' +
+    '<td class="col-urgent" data-label="กำหนด">' + urgentText + '</td>' +
+    '<td class="col-drive" data-label="Drive">' +
+      (hasDrive ? '<i class="fa-brands fa-google-drive text-blue-600" title="มีลิงก์"></i>' : '—') +
+    '</td>';
+
+  return tr;
 }
 
 function makeStatCard(num, label, icon, tone) {
@@ -1857,71 +1968,6 @@ function makeStatCard(num, label, icon, tone) {
   lbl.textContent = label;
   el.append(top, numEl, lbl);
   return el;
-}
-
-function buildProjectDashboardCard(project, rank) {
-  const st = Utils.getProjectStatus(project);
-  const card = document.createElement('article');
-  card.className = 'project-card ' + st.border;
-  card.onclick = () => renderProjectView(project.id);
-  const urgentDays = Utils.nearestUrgentExpiryDays(project);
-
-  const head = document.createElement('div');
-  head.className = 'flex justify-between items-start gap-2 mb-2';
-  const rankBadge = rank
-    ? '<span class="text-[10px] font-black text-slate-400 bg-slate-100 border rounded px-1.5 py-0.5 shrink-0" title="ลำดับความสำคัญ">#' + rank + '</span>'
-    : '';
-  head.innerHTML =
-    '<div class="flex items-start gap-2 min-w-0 flex-1">' + rankBadge +
-    '<h4 class="font-bold text-slate-800 leading-snug">' + Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</h4></div>' +
-    '<span class="status-pill ' + st.pill + ' shrink-0">' + st.text + '</span>';
-
-  const dept = document.createElement('p');
-  dept.className = 'text-xs text-slate-500 mb-2';
-  dept.innerHTML = '<i class="fa-solid fa-tag mr-1"></i>' + Utils.escapeHtml(project.department || '-');
-
-  const counts = document.createElement('div');
-  counts.className = 'flex gap-3 text-[11px] text-slate-600';
-  counts.innerHTML =
-    '<span class="text-emerald-600"><i class="fa-solid fa-circle text-[6px]"></i> ' + st.counts.safe + '</span>' +
-    '<span class="text-amber-600"><i class="fa-solid fa-circle text-[6px]"></i> ' + st.counts.warning + '</span>' +
-    '<span class="text-rose-600"><i class="fa-solid fa-circle text-[6px]"></i> ' + st.counts.expired + '</span>';
-
-  const drive = document.createElement('p');
-  const hasDrive = !!Utils.getProjectDriveUrl(project);
-  drive.className = hasDrive ? 'text-[11px] text-blue-600 mt-2 truncate' : 'text-[11px] text-slate-400 mt-2';
-  drive.innerHTML = hasDrive
-    ? '<i class="fa-brands fa-google-drive mr-1"></i>มีลิงก์ Drive — เปิดได้จากหน้าโครงการ'
-    : '<i class="fa-brands fa-google-drive mr-1"></i>ยังไม่มีลิงก์ — ต้องใส่ URL ก่อนเปิดไฟล์';
-
-  card.append(head, dept, counts, drive);
-
-  if (urgentDays < 99999 && st.status !== 'safe' && st.status !== 'empty') {
-    const urgent = document.createElement('p');
-    urgent.className = 'text-[11px] font-bold mt-2 ' + (urgentDays < 0 ? 'text-rose-600' : 'text-amber-600');
-    urgent.innerHTML = urgentDays < 0
-      ? '<i class="fa-solid fa-calendar-xmark mr-1"></i>หมดอายุแล้ว ' + Math.abs(urgentDays) + ' วัน'
-      : '<i class="fa-solid fa-calendar-day mr-1"></i>หมดอายุในอีก ' + urgentDays + ' วัน';
-    card.appendChild(urgent);
-  }
-
-  return card;
-}
-
-function buildAlertRow(project, license, st) {
-  const row = document.createElement('article');
-  row.className = 'bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:shadow-md transition-shadow';
-  const info = document.createElement('div');
-  info.innerHTML =
-    '<p class="font-bold text-sm">' + Utils.escapeHtml(license.name) + ' <span class="status-pill ' + st.status + ' ml-1">' + st.text + '</span></p>' +
-    '<p class="text-xs text-slate-500 mt-1">' + Utils.escapeHtml(project.name) + ' · หมดอายุ ' + Utils.formatDate(license.expiryDate) + '</p>';
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'btn-primary text-sm px-4 py-2 shrink-0';
-  btn.textContent = 'จัดการ';
-  btn.onclick = () => renderProjectView(project.id);
-  row.append(info, btn);
-  return row;
 }
 
 window.showDashboard = showDashboard;

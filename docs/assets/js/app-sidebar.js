@@ -46,6 +46,7 @@ function renderSidebar(light) {
     const ul = document.createElement('ul');
     ul.className = 'space-y-1';
 
+    projs.sort((a, b) => Utils.compareProjectsByPriority(a, b));
     projs.forEach(project => {
       const st = Utils.getProjectStatus(project);
       const li = document.createElement('li');
