@@ -46,6 +46,10 @@ function routeAction_(action, data) {
       var lic = SheetService.saveLicense(data);
       return { success: true, id: lic.id, projectId: data.projectId };
     }
+    case 'saveLicenseSteps': {
+      var stepRes = SheetService.saveLicenseSteps(data);
+      return { success: true, licenseId: stepRes.id, status: stepRes.status, steps: stepRes.steps };
+    }
     case 'saveTimelineUpdate':
       SheetService.saveTimelineUpdate(data);
       return { success: true, licenseId: data.licenseId };

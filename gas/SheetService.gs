@@ -312,18 +312,57 @@ var SheetService = (function () {
     return { success: true, id: newId };
   }
 
+  function reconcileStatusAfterStepsChange_(licenseId, steps, oldStatus) {
+    if (!steps.length) return oldStatus || '';
+    if (oldStatus && steps.indexOf(oldStatus) >= 0) return oldStatus;
+    var historyRows = readTable_(CONFIG.SHEETS.HISTORY);
+    var done = {};
+    historyRows.forEach(function (h) {
+      if (String(h.licenseId) === String(licenseId) && h.action) done[h.action] = true;
+    });
+    for (var i = 0; i < steps.length; i++) {
+      if (!done[steps[i]]) return steps[i];
+    }
+    return steps[steps.length - 1];
+  }
+
+  function saveLicenseSteps(data) {
+    var licenseId = Number(data.licenseId);
+    var steps = data.steps || [];
+    if (!licenseId) throw new Error('ไม่พบใบอนุญาต');
+    if (!steps.length) throw new Error('ต้องมีอย่างน้อย 1 ขั้นตอน');
+    var lic = getLicenseRow_(licenseId);
+    if (!lic) throw new Error('ไม่พบใบอนุญาต');
+
+    var status = reconcileStatusAfterStepsChange_(licenseId, steps, lic.status || '');
+    var newId = upsertRow_(CONFIG.SHEETS.LICENSES, licenseId, {
+      id: licenseId,
+      projectId: lic.projectId,
+      name: lic.name,
+      issueDate: formatDateValue_(lic.issueDate),
+      expiryDate: formatDateValue_(lic.expiryDate),
+      alertMonths: Number(lic.alertMonths) || 3,
+      driveUrl: lic.driveUrl || '',
+      status: status,
+      steps: JSON.stringify(steps),
+      renewalCycles: lic.renewalCycles || '[]',
+      createdAt: ''
+    }, [
+      'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+      'driveUrl', 'status', 'steps', 'renewalCycles', 'createdAt', 'updatedAt'
+    ]);
+    invalidateCache_();
+    return { success: true, id: newId, status: status, steps: steps };
+  }
+
   function saveLicense(data) {
     var steps = data.steps || CONFIG.DEFAULT_STEPS;
     var id = data.id ? Number(data.id) : null;
     var existingCycles = '[]';
+    var existing = null;
     if (id) {
-      var licRows = readTable_(CONFIG.SHEETS.LICENSES);
-      for (var li = 0; li < licRows.length; li++) {
-        if (Number(licRows[li].id) === id) {
-          existingCycles = licRows[li].renewalCycles || '[]';
-          break;
-        }
-      }
+      existing = getLicenseRow_(id);
+      if (existing) existingCycles = existing.renewalCycles || '[]';
     }
     var newId = upsertRow_(CONFIG.SHEETS.LICENSES, id, {
       id: id || '',
@@ -333,7 +372,7 @@ var SheetService = (function () {
       expiryDate: data.expiryDate,
       alertMonths: data.alertMonths || 3,
       driveUrl: data.driveUrl || '',
-      status: data.status || 'รอเริ่มดำเนินการ',
+      status: data.status || (existing && existing.status) || 'รอเริ่มดำเนินการ',
       steps: JSON.stringify(steps),
       renewalCycles: data.renewalCycles !== undefined ? data.renewalCycles : existingCycles,
       createdAt: ''
@@ -477,6 +516,7 @@ var SheetService = (function () {
     getPayload: getPayload,
     saveProject: saveProject,
     saveLicense: saveLicense,
+    saveLicenseSteps: saveLicenseSteps,
     saveTimelineUpdate: saveTimelineUpdate,
     completeRenewal: completeRenewal,
     addHistoryEntry: addHistoryEntry,

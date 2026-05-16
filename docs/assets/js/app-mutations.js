@@ -54,6 +54,15 @@ const Mutations = {
     return id;
   },
 
+  updateLicenseStepsLocal(projectId, licenseId, steps, status) {
+    const l = this.findLicense(projectId, licenseId);
+    if (!l) return null;
+    l.steps = steps;
+    if (status) l.status = status;
+    this.persist();
+    return l;
+  },
+
   timelineUpdateLocal(licenseId, step, note) {
     let found = null;
     App.projects.forEach(p => {

@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '14';
+const ASSET_V = '15';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -59,7 +59,14 @@ const licenseModal = modal('licenseModal', 'max-w-xl', `
 const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 <${d} class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white font-bold flex justify-between items-center"><span><i class="fa-solid fa-list-check mr-2"></i><span id="timelineModalTitle">ขั้นตอนใบอนุญาต</span></span><button type="button" onclick="closeModal('timelineModal')" class="w-8 h-8 rounded-lg bg-white/20"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
-<${d} class="md:w-1/2 p-5 overflow-y-auto border-r bg-slate-50 custom-scrollbar"><h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ขั้นตอนดำเนินการ</h4><${d} id="timeline-container" class="pr-2 mb-4"></${d}><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 border-t pt-4"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>
+<${d} class="md:w-1/2 p-5 overflow-y-auto border-r bg-slate-50 custom-scrollbar">
+<${d} class="steps-editor-box mb-4">
+<h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-indigo-500"></i> แก้ไขขั้นตอนดำเนินการ</h4>
+<p class="text-xs text-slate-500 mb-2">แก้ไขได้ตลอดเวลา — หนึ่งบรรทัดต่อหนึ่งขั้นตอน</p>
+<textarea id="timeline-steps-edit" rows="6" class="w-full border rounded-xl p-2.5 text-sm bg-white" placeholder="1. ขั้นตอนแรก&#10;2. ขั้นตอนถัดไป"></textarea>
+<button type="button" onclick="saveLicenseSteps()" class="w-full mt-2 bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกรายการขั้นตอน</button>
+</${d}>
+<h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ความคืบหน้า</h4><${d} id="timeline-container" class="pr-2 mb-4"></${d}><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 border-t pt-4"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>
 <${d} class="md:w-1/2 flex flex-col">
 <${d} class="p-4 border-b bg-white"><input type="hidden" id="update-license-id">
 <label class="text-xs font-bold text-slate-600 block mb-1">อัปเดตขั้นตอน<select id="update-step" class="w-full border rounded-xl p-2.5 text-sm mt-1"></select></label>

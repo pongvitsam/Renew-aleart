@@ -222,6 +222,27 @@ const DataCache = {
     return this.isDriveUrl(project?.driveUrl) ? String(project.driveUrl).trim() : '';
   },
 
+  parseStepsText(text) {
+    return String(text || '')
+      .split('\n')
+      .map(s => s.trim().replace(/^\d+\.\s*/, ''))
+      .filter(Boolean);
+  },
+
+  formatStepsText(steps) {
+    return (steps || [])
+      .map((s, i) => (i + 1) + '. ' + s)
+      .join('\n');
+  },
+
+  resolveStatusAfterStepsChange(steps, currentStatus, history) {
+    if (!steps.length) return currentStatus || '';
+    if (currentStatus && steps.includes(currentStatus)) return currentStatus;
+    const done = new Set((history || []).map(h => h.action));
+    const next = steps.find(s => !done.has(s));
+    return next || steps[steps.length - 1];
+  },
+
   isRenewalStepsComplete(license) {
     const steps = license?.steps || [];
     if (!steps.length) return false;
@@ -320,6 +341,15 @@ const Mutations = {
     p.licenses.push(license);
     this.persist();
     return id;
+  },
+
+  updateLicenseStepsLocal(projectId, licenseId, steps, status) {
+    const l = this.findLicense(projectId, licenseId);
+    if (!l) return null;
+    l.steps = steps;
+    if (status) l.status = status;
+    this.persist();
+    return l;
   },
 
   timelineUpdateLocal(licenseId, step, note) {
@@ -590,6 +620,12 @@ const Api = {
 
   async saveLicense(data) {
     const res = await this.call('saveLicense', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveLicenseSteps(data) {
+    const res = await this.call('saveLicenseSteps', data, { skipCache: true });
     this.scheduleBackgroundRefresh();
     return res;
   },
@@ -1118,7 +1154,16 @@ const TimelineUI = {
     if (!container) return;
     container.replaceChildren();
 
-    (license.steps || []).forEach((step, idx) => {
+    const steps = license.steps || [];
+    if (!steps.length) {
+      const empty = document.createElement('p');
+      empty.className = 'text-sm text-slate-500 text-center py-4';
+      empty.textContent = 'ยังไม่มีขั้นตอน — กรอกด้านบนแล้วกดบันทึก';
+      container.appendChild(empty);
+      return;
+    }
+
+    steps.forEach((step, idx) => {
       const done = (license.history || []).some(h => h.action === step);
       const current = license.status === step;
       const hist = (license.history || []).filter(h => h.action === step);
@@ -1205,12 +1250,14 @@ async function renderTimeline(projectId, licenseId) {
   let license = project?.licenses?.find(l => l.id === licenseId);
   if (!license) return;
 
+  App.currentProjectId = projectId;
   document.getElementById('timelineModalTitle').textContent = license.name;
   document.getElementById('update-license-id').value = license.id;
   openModal('timelineModal');
   paintTimelineModal(license);
 
-  if (license.history && license.history.length) return;
+  const needsDetail = !license.steps?.length || !Array.isArray(license.history);
+  if (!needsDetail) return;
 
   license._historyLoading = true;
   TimelineUI.renderLogs(license);
@@ -1225,12 +1272,26 @@ async function renderTimeline(projectId, licenseId) {
       }
     }
   } catch {
-    license._historyLoading = false;
-    TimelineUI.renderLogs(license);
+    if (license) {
+      license._historyLoading = false;
+      TimelineUI.renderLogs(license);
+    }
   }
 }
 
 function paintTimelineModal(license) {
+  const stepsEdit = document.getElementById('timeline-steps-edit');
+  if (stepsEdit) {
+    const defaultSteps = [
+      'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
+      'ขอเอกสารสนับสนุนจากลูกค้า',
+      'ได้รับเอกสารครบถ้วน',
+      'ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ',
+      'แจ้งผลให้ลูกค้าทราบ',
+      'เสร็จสิ้นสมบูรณ์'
+    ];
+    stepsEdit.value = Utils.formatStepsText(license.steps?.length ? license.steps : defaultSteps);
+  }
   TimelineUI.render(license);
   RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
@@ -1240,7 +1301,37 @@ function paintTimelineModal(license) {
   (license.steps || []).forEach(s => select.append(new Option(s, s, false, license.status === s)));
 }
 
+async function saveLicenseSteps() {
+  const licenseId = Number(document.getElementById('update-license-id').value);
+  const projectId = App.currentProjectId;
+  const license = Mutations.findLicense(projectId, licenseId);
+  if (!license) return showToast('ไม่พบใบอนุญาต', 'error');
+
+  const steps = Utils.parseStepsText(document.getElementById('timeline-steps-edit').value);
+  if (!steps.length) return showToast('ต้องมีอย่างน้อย 1 ขั้นตอน', 'error');
+
+  const status = Utils.resolveStatusAfterStepsChange(steps, license.status, license.history);
+
+  Mutations.updateLicenseStepsLocal(projectId, licenseId, steps, status);
+  paintTimelineModal(Mutations.findLicense(projectId, licenseId));
+  showToast('บันทึกรายการขั้นตอนแล้ว');
+  refreshCurrentView();
+
+  try {
+    await Api.saveLicenseSteps({ licenseId, steps });
+    const res = await Api.getLicenseDetail(licenseId);
+    if (res.license) {
+      Api.mergeLicenseDetail(licenseId, res.license);
+      paintTimelineModal(Mutations.findLicense(projectId, licenseId));
+    }
+  } catch (err) {
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
+  }
+}
+
 window.renderTimeline = renderTimeline;
+window.saveLicenseSteps = saveLicenseSteps;
 
 /* app-renewal.js */
 const RenewalUI = {
@@ -1828,7 +1919,7 @@ async function saveLicense() {
   const stepsTxt = document.getElementById('license-steps').value;
   if (!name || !issueDate || !expiryDate) return showToast('กรุณากรอกข้อมูลสำคัญให้ครบ', 'error');
 
-  const steps = stepsTxt.split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(Boolean);
+  const steps = Utils.parseStepsText(stepsTxt);
   const payload = {
     projectId: App.currentProjectId,
     name, issueDate, expiryDate, alertMonths, driveUrl: '', steps,

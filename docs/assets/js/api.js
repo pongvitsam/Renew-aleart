@@ -207,6 +207,12 @@ const Api = {
     return res;
   },
 
+  async saveLicenseSteps(data) {
+    const res = await this.call('saveLicenseSteps', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
   async saveTimelineUpdate(data) {
     const res = await this.call('saveTimelineUpdate', data, { skipCache: true });
     this.scheduleBackgroundRefresh();

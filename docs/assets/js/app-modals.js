@@ -103,7 +103,7 @@ async function saveLicense() {
   const stepsTxt = document.getElementById('license-steps').value;
   if (!name || !issueDate || !expiryDate) return showToast('กรุณากรอกข้อมูลสำคัญให้ครบ', 'error');
 
-  const steps = stepsTxt.split('\n').map(s => s.trim().replace(/^\d+\.\s*/, '')).filter(Boolean);
+  const steps = Utils.parseStepsText(stepsTxt);
   const payload = {
     projectId: App.currentProjectId,
     name, issueDate, expiryDate, alertMonths, driveUrl: '', steps,

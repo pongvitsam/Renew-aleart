@@ -175,6 +175,27 @@
     return this.isDriveUrl(project?.driveUrl) ? String(project.driveUrl).trim() : '';
   },
 
+  parseStepsText(text) {
+    return String(text || '')
+      .split('\n')
+      .map(s => s.trim().replace(/^\d+\.\s*/, ''))
+      .filter(Boolean);
+  },
+
+  formatStepsText(steps) {
+    return (steps || [])
+      .map((s, i) => (i + 1) + '. ' + s)
+      .join('\n');
+  },
+
+  resolveStatusAfterStepsChange(steps, currentStatus, history) {
+    if (!steps.length) return currentStatus || '';
+    if (currentStatus && steps.includes(currentStatus)) return currentStatus;
+    const done = new Set((history || []).map(h => h.action));
+    const next = steps.find(s => !done.has(s));
+    return next || steps[steps.length - 1];
+  },
+
   isRenewalStepsComplete(license) {
     const steps = license?.steps || [];
     if (!steps.length) return false;
