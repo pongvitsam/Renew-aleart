@@ -150,7 +150,9 @@ const Api = {
     try {
       json = this.parseResponseText(text, action);
     } catch (err) {
-      if (/เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) && typeof Auth !== 'undefined') {
+      if (action !== 'login' && action !== 'logout' &&
+        /เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) &&
+        typeof Auth !== 'undefined') {
         Auth.forceLogout(err.message);
       }
       throw err;
@@ -272,7 +274,7 @@ const Api = {
   },
 
   login(data) {
-    return this.call('login', data, { skipCache: true, timeoutMs: 30000 });
+    return this.call('login', data, { skipCache: true, timeoutMs: 120000 });
   },
 
   logout(data) {

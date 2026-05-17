@@ -457,467 +457,6 @@ function refreshCurrentView() {
   else if (App.currentProjectId) renderProjectView(App.currentProjectId);
 }
 
-/* api.js */
-const Api = {
-  TIMEOUT_MS: 40000,
-  MAX_RETRIES: 2,
-  LOAD_BUDGET_MS: 2800,
-
-  getSnapshotUrl() {
-    const base = (CONFIG.BASE_PATH || '/Renew-aleart').replace(/\/$/, '');
-    return (CONFIG.SNAPSHOT_URL || base + '/data/payload.json').split('?')[0];
-  },
-
-  normalizeSnapshot(data) {
-    if (!data || !Array.isArray(data.projects)) return null;
-    return {
-      success: true,
-      projects: data.projects,
-      departments: data.departments || [],
-      _fromSnapshot: true
-    };
-  },
-
-  async fetchJsonWithTimeout(url, timeoutMs) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
-      clearTimeout(timer);
-      if (!res.ok) return null;
-      return await res.json();
-    } catch {
-      clearTimeout(timer);
-      return null;
-    }
-  },
-
-  async consumeSnapshotPrefetch() {
-    if (!window.__SNAPSHOT_PREFETCH__) return null;
-    const pref = window.__SNAPSHOT_PREFETCH__;
-    delete window.__SNAPSHOT_PREFETCH__;
-    try {
-      const data = await pref;
-      return this.normalizeSnapshot(data);
-    } catch {
-      return null;
-    }
-  },
-
-  async fetchSnapshot(timeoutMs) {
-    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
-    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
-    return this.normalizeSnapshot(data);
-  },
-
-  /** โหลดครั้งแรก: snapshot เท่านั้น ไม่รอ GAS (งบเวลา LOAD_BUDGET_MS) */
-  async loadInitialPayload() {
-    const budget = CONFIG.LOAD_BUDGET_MS || this.LOAD_BUDGET_MS;
-
-    if (window.__BOOT_CACHE__) {
-      const boot = window.__BOOT_CACHE__;
-      delete window.__BOOT_CACHE__;
-      return { success: true, ...boot, _fromCache: true };
-    }
-
-    const pref = await this.consumeSnapshotPrefetch();
-    if (pref) {
-      DataCache.set({ projects: pref.projects, departments: pref.departments });
-      return pref;
-    }
-
-    const snap = await this.fetchSnapshot(budget);
-    if (snap) {
-      DataCache.set({ projects: snap.projects, departments: snap.departments });
-      return snap;
-    }
-
-    return { success: true, projects: [], departments: [], _empty: true };
-  },
-
-  async fetchWithTimeout(url, options, timeoutMs) {
-    const ms = timeoutMs || this.TIMEOUT_MS;
-    let lastErr;
-    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), ms);
-      try {
-        const res = await fetch(url, { ...options, signal: controller.signal });
-        clearTimeout(timer);
-        return res;
-      } catch (err) {
-        clearTimeout(timer);
-        lastErr = err;
-        const retryable = err.name === 'AbortError' ||
-          (err.message && /failed to fetch|network/i.test(err.message));
-        if (attempt < this.MAX_RETRIES && retryable && ms >= 10000) {
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        if (err.name === 'AbortError') {
-          throw new Error('API ช้าเกินไป — กำลังซิงค์ในพื้นหลัง ลองรีเฟรชอีกครั้ง');
-        }
-        throw err;
-      }
-    }
-    throw lastErr;
-  },
-
-  parseResponseText(text, action) {
-    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
-      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version)');
-    }
-    let json;
-    try { json = JSON.parse(text); } catch {
-      throw new Error('ตอบกลับ API ไม่ถูกต้อง');
-    }
-    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
-    if (action === 'getProjects' && json.projects) {
-      DataCache.set({ projects: json.projects, departments: json.departments });
-    }
-    return json;
-  },
-
-  withSession(data) {
-    const token = typeof AuthStore !== 'undefined' ? AuthStore.getToken() : null;
-    if (!token) return data;
-    return { ...data, sessionToken: token };
-  },
-
-  async call(action, data = {}, opts = {}) {
-    if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
-    const apiUrl = (CONFIG.API_URL || '').trim();
-    if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
-
-    const publicActions = { login: true, ping: true };
-    const payload = publicActions[action] ? data : this.withSession(data);
-
-    if (action === 'getProjects' && !opts.skipCache) {
-      const cached = DataCache.get();
-      if (cached) return { success: true, ...cached };
-    }
-
-    const timeout = opts.timeoutMs || this.TIMEOUT_MS;
-    const response = await this.fetchWithTimeout(apiUrl, {
-      method: 'POST',
-      redirect: 'follow',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, data: payload })
-    }, timeout);
-
-    const text = await response.text();
-    let json;
-    try {
-      json = this.parseResponseText(text, action);
-    } catch (err) {
-      if (/เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) && typeof Auth !== 'undefined') {
-        Auth.forceLogout(err.message);
-      }
-      throw err;
-    }
-    if (action === 'getProjects') json._fromApi = true;
-    return json;
-  },
-
-  applyPayload(res) {
-    if (res.projects) App.projects = res.projects;
-    if (res.departments) App.departments = res.departments;
-    if (res.projects) {
-      DataCache.set({ projects: App.projects, departments: App.departments });
-    }
-    if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
-    return res;
-  },
-
-  scheduleBackgroundRefresh() {
-    clearTimeout(this._refreshTimer);
-    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
-  },
-
-  syncFromApiInBackground() {
-    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
-      .then(res => {
-        this.applyPayload(res);
-        DataCache.set({ projects: res.projects, departments: res.departments });
-        hideSyncIndicator();
-        refreshCurrentView();
-        return res;
-      })
-      .catch(() => {});
-  },
-
-  refreshInBackground() {
-    return this.syncFromApiInBackground();
-  },
-
-  getProjects(opts = {}) {
-    if (opts.background) {
-      return this.syncFromApiInBackground();
-    }
-    return this.call('getProjects', {}, opts);
-  },
-
-  getLicenseDetail(licenseId) {
-    return this.call('getLicenseDetail', { licenseId }, { skipCache: true });
-  },
-
-  mergeLicenseDetail(licenseId, detail) {
-    App.projects.forEach(p => {
-      (p.licenses || []).forEach(l => {
-        if (Number(l.id) === Number(licenseId)) {
-          l.history = detail.history || [];
-          l.steps = detail.steps || l.steps;
-          l.renewalCycles = detail.renewalCycles || l.renewalCycles;
-          l.status = detail.status || l.status;
-        }
-      });
-    });
-    DataCache.set({ projects: App.projects, departments: App.departments });
-  },
-
-  async saveProject(data) {
-    const res = await this.call('saveProject', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async deleteProject(data) {
-    const res = await this.call('deleteProject', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async saveLicense(data) {
-    const res = await this.call('saveLicense', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async saveLicenseSteps(data) {
-    const res = await this.call('saveLicenseSteps', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async saveTimelineUpdate(data) {
-    const res = await this.call('saveTimelineUpdate', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async completeRenewal(data) {
-    const res = await this.call('completeRenewal', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  async sendTestEmail(data) {
-    const res = await this.call('sendTestEmail', data, { skipCache: true });
-    this.scheduleBackgroundRefresh();
-    return res;
-  },
-
-  saveDepartment(data) {
-    return this.call('saveDepartment', data, { skipCache: true }).then(res => {
-      this.scheduleBackgroundRefresh();
-      return res;
-    });
-  },
-
-  deleteDepartment(data) {
-    return this.call('deleteDepartment', data, { skipCache: true }).then(res => {
-      this.scheduleBackgroundRefresh();
-      return res;
-    });
-  },
-
-  login(data) {
-    return this.call('login', data, { skipCache: true, timeoutMs: 30000 });
-  },
-
-  logout(data) {
-    return this.call('logout', data || {}, { skipCache: true, timeoutMs: 15000 });
-  },
-
-  validateSession() {
-    return this.call('validateSession', {}, { skipCache: true, timeoutMs: 15000 });
-  },
-
-  listUsers() {
-    return this.call('listUsers', {}, { skipCache: true });
-  },
-
-  saveUser(data) {
-    return this.call('saveUser', data, { skipCache: true });
-  },
-
-  deleteUser(data) {
-    return this.call('deleteUser', data, { skipCache: true });
-  },
-
-};
-
-/* app-auth.js */
-const AuthStore = {
-  KEY: 'renew_session_v1',
-
-  get() {
-    try {
-      const raw = localStorage.getItem(this.KEY);
-      if (!raw) return null;
-      const o = JSON.parse(raw);
-      if (!o.token || !o.user) return null;
-      if (o.expiresAt && Date.now() > new Date(o.expiresAt).getTime()) {
-        this.clear();
-        return null;
-      }
-      return o;
-    } catch {
-      return null;
-    }
-  },
-
-  set(session) {
-    localStorage.setItem(this.KEY, JSON.stringify(session));
-  },
-
-  clear() {
-    localStorage.removeItem(this.KEY);
-  },
-
-  getToken() {
-    const s = this.get();
-    return s ? s.token : null;
-  }
-};
-
-const Auth = {
-  _started: false,
-
-  init() {
-    const session = AuthStore.get();
-    if (session) {
-      App.currentUser = session.user;
-      this.showApp();
-      this.updateChrome();
-      return true;
-    }
-    this.showLogin();
-    return false;
-  },
-
-  showLogin() {
-    const screen = document.getElementById('login-screen');
-    const root = document.getElementById('app-root');
-    if (screen) screen.classList.remove('hidden');
-    if (root) root.classList.add('hidden');
-    document.body.classList.add('login-mode');
-  },
-
-  showApp() {
-    const screen = document.getElementById('login-screen');
-    const root = document.getElementById('app-root');
-    if (screen) screen.classList.add('hidden');
-    if (root) root.classList.remove('hidden');
-    document.body.classList.remove('login-mode');
-  },
-
-  updateChrome() {
-    const user = App.currentUser;
-    const badge = document.getElementById('user-badge');
-    const adminBtn = document.getElementById('admin-users-btn');
-    if (badge && user) {
-      const roleLabel = user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
-      badge.innerHTML =
-        '<i class="fa-solid fa-user-circle"></i> ' +
-        Utils.escapeHtml(user.displayName || user.username) +
-        ' <span class="text-slate-400 font-normal">(' + roleLabel + ')</span>';
-    }
-    if (adminBtn) {
-      adminBtn.classList.toggle('hidden', !user || user.role !== 'admin');
-    }
-  },
-
-  async submitLogin() {
-    const username = (document.getElementById('login-username')?.value || '').trim();
-    const password = document.getElementById('login-password')?.value || '';
-    const errEl = document.getElementById('login-error');
-    const btn = document.getElementById('login-submit-btn');
-
-    if (errEl) errEl.textContent = '';
-    if (!username || !password) {
-      if (errEl) errEl.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
-      return;
-    }
-
-    if (btn) btn.disabled = true;
-    try {
-      const res = await Api.login({ username, password });
-      AuthStore.set({ token: res.token, user: res.user, expiresAt: res.expiresAt });
-      App.currentUser = res.user;
-      this.showApp();
-      this.updateChrome();
-      if (!Auth._started) {
-        Auth._started = true;
-        loadProjects().catch(onProjectsLoadError);
-      }
-    } catch (err) {
-      if (errEl) errEl.textContent = err.message || 'เข้าสู่ระบบไม่สำเร็จ';
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  },
-
-  async logout() {
-    const token = AuthStore.getToken();
-    AuthStore.clear();
-    App.currentUser = null;
-    Auth._started = false;
-    try {
-      if (token) await Api.logout({ sessionToken: token });
-    } catch (_) {}
-    App.projects = [];
-    App.departments = [];
-    DataCache.clear();
-    this.showLogin();
-    const main = document.getElementById('main-content');
-    if (main) main.replaceChildren();
-  },
-
-  forceLogout(message) {
-    AuthStore.clear();
-    App.currentUser = null;
-    Auth._started = false;
-    this.showLogin();
-    const errEl = document.getElementById('login-error');
-    if (errEl && message) errEl.textContent = message;
-  },
-
-  onLoginKeydown(e) {
-    if (e.key === 'Enter') this.submitLogin();
-  }
-};
-
-Object.assign(window, {
-  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout()
-});
-
-/* app-index.js */
-function rebuildAppIndex() {
-  App.expiryEvents = [];
-  App.projects.forEach(project => {
-    (project.licenses || []).forEach(license => {
-      if (!license.expiryDate) return;
-      App.expiryEvents.push({
-        date: license.expiryDate,
-        project,
-        license,
-        status: Utils.calculateStatus(license.expiryDate, license.alertMonths).status
-      });
-    });
-  });
-}
-
 /* app-state.js */
 const App = {
   projects: [],
@@ -1080,6 +619,503 @@ function demoBadgeHtml(isDemo) {
 window.toggleSidebar = toggleSidebar;
 window.loadProjects = loadProjects;
 window.demoBadgeHtml = demoBadgeHtml;
+
+/* api.js */
+const Api = {
+  TIMEOUT_MS: 40000,
+  MAX_RETRIES: 2,
+  LOAD_BUDGET_MS: 2800,
+
+  getSnapshotUrl() {
+    const base = (CONFIG.BASE_PATH || '/Renew-aleart').replace(/\/$/, '');
+    return (CONFIG.SNAPSHOT_URL || base + '/data/payload.json').split('?')[0];
+  },
+
+  normalizeSnapshot(data) {
+    if (!data || !Array.isArray(data.projects)) return null;
+    return {
+      success: true,
+      projects: data.projects,
+      departments: data.departments || [],
+      _fromSnapshot: true
+    };
+  },
+
+  async fetchJsonWithTimeout(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      clearTimeout(timer);
+      return null;
+    }
+  },
+
+  async consumeSnapshotPrefetch() {
+    if (!window.__SNAPSHOT_PREFETCH__) return null;
+    const pref = window.__SNAPSHOT_PREFETCH__;
+    delete window.__SNAPSHOT_PREFETCH__;
+    try {
+      const data = await pref;
+      return this.normalizeSnapshot(data);
+    } catch {
+      return null;
+    }
+  },
+
+  async fetchSnapshot(timeoutMs) {
+    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
+    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
+    return this.normalizeSnapshot(data);
+  },
+
+  /** โหลดครั้งแรก: snapshot เท่านั้น ไม่รอ GAS (งบเวลา LOAD_BUDGET_MS) */
+  async loadInitialPayload() {
+    const budget = CONFIG.LOAD_BUDGET_MS || this.LOAD_BUDGET_MS;
+
+    if (window.__BOOT_CACHE__) {
+      const boot = window.__BOOT_CACHE__;
+      delete window.__BOOT_CACHE__;
+      return { success: true, ...boot, _fromCache: true };
+    }
+
+    const pref = await this.consumeSnapshotPrefetch();
+    if (pref) {
+      DataCache.set({ projects: pref.projects, departments: pref.departments });
+      return pref;
+    }
+
+    const snap = await this.fetchSnapshot(budget);
+    if (snap) {
+      DataCache.set({ projects: snap.projects, departments: snap.departments });
+      return snap;
+    }
+
+    return { success: true, projects: [], departments: [], _empty: true };
+  },
+
+  async fetchWithTimeout(url, options, timeoutMs) {
+    const ms = timeoutMs || this.TIMEOUT_MS;
+    let lastErr;
+    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), ms);
+      try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timer);
+        return res;
+      } catch (err) {
+        clearTimeout(timer);
+        lastErr = err;
+        const retryable = err.name === 'AbortError' ||
+          (err.message && /failed to fetch|network/i.test(err.message));
+        if (attempt < this.MAX_RETRIES && retryable && ms >= 10000) {
+          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+          continue;
+        }
+        if (err.name === 'AbortError') {
+          throw new Error('API ช้าเกินไป — กำลังซิงค์ในพื้นหลัง ลองรีเฟรชอีกครั้ง');
+        }
+        throw err;
+      }
+    }
+    throw lastErr;
+  },
+
+  parseResponseText(text, action) {
+    if (text.indexOf('<!DOCTYPE') === 0 || text.indexOf('<html') >= 0) {
+      throw new Error('API ยังไม่พร้อม — Deploy Web App (New version)');
+    }
+    let json;
+    try { json = JSON.parse(text); } catch {
+      throw new Error('ตอบกลับ API ไม่ถูกต้อง');
+    }
+    if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
+    if (action === 'getProjects' && json.projects) {
+      DataCache.set({ projects: json.projects, departments: json.departments });
+    }
+    return json;
+  },
+
+  withSession(data) {
+    const token = typeof AuthStore !== 'undefined' ? AuthStore.getToken() : null;
+    if (!token) return data;
+    return { ...data, sessionToken: token };
+  },
+
+  async call(action, data = {}, opts = {}) {
+    if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
+    const apiUrl = (CONFIG.API_URL || '').trim();
+    if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
+
+    const publicActions = { login: true, ping: true };
+    const payload = publicActions[action] ? data : this.withSession(data);
+
+    if (action === 'getProjects' && !opts.skipCache) {
+      const cached = DataCache.get();
+      if (cached) return { success: true, ...cached };
+    }
+
+    const timeout = opts.timeoutMs || this.TIMEOUT_MS;
+    const response = await this.fetchWithTimeout(apiUrl, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, data: payload })
+    }, timeout);
+
+    const text = await response.text();
+    let json;
+    try {
+      json = this.parseResponseText(text, action);
+    } catch (err) {
+      if (action !== 'login' && action !== 'logout' &&
+        /เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) &&
+        typeof Auth !== 'undefined') {
+        Auth.forceLogout(err.message);
+      }
+      throw err;
+    }
+    if (action === 'getProjects') json._fromApi = true;
+    return json;
+  },
+
+  applyPayload(res) {
+    if (res.projects) App.projects = res.projects;
+    if (res.departments) App.departments = res.departments;
+    if (res.projects) {
+      DataCache.set({ projects: App.projects, departments: App.departments });
+    }
+    if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
+    return res;
+  },
+
+  scheduleBackgroundRefresh() {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
+  },
+
+  syncFromApiInBackground() {
+    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
+      .then(res => {
+        this.applyPayload(res);
+        DataCache.set({ projects: res.projects, departments: res.departments });
+        hideSyncIndicator();
+        refreshCurrentView();
+        return res;
+      })
+      .catch(() => {});
+  },
+
+  refreshInBackground() {
+    return this.syncFromApiInBackground();
+  },
+
+  getProjects(opts = {}) {
+    if (opts.background) {
+      return this.syncFromApiInBackground();
+    }
+    return this.call('getProjects', {}, opts);
+  },
+
+  getLicenseDetail(licenseId) {
+    return this.call('getLicenseDetail', { licenseId }, { skipCache: true });
+  },
+
+  mergeLicenseDetail(licenseId, detail) {
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) === Number(licenseId)) {
+          l.history = detail.history || [];
+          l.steps = detail.steps || l.steps;
+          l.renewalCycles = detail.renewalCycles || l.renewalCycles;
+          l.status = detail.status || l.status;
+        }
+      });
+    });
+    DataCache.set({ projects: App.projects, departments: App.departments });
+  },
+
+  async saveProject(data) {
+    const res = await this.call('saveProject', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async deleteProject(data) {
+    const res = await this.call('deleteProject', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveLicense(data) {
+    const res = await this.call('saveLicense', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveLicenseSteps(data) {
+    const res = await this.call('saveLicenseSteps', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async saveTimelineUpdate(data) {
+    const res = await this.call('saveTimelineUpdate', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async completeRenewal(data) {
+    const res = await this.call('completeRenewal', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async sendTestEmail(data) {
+    const res = await this.call('sendTestEmail', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  saveDepartment(data) {
+    return this.call('saveDepartment', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
+  },
+
+  deleteDepartment(data) {
+    return this.call('deleteDepartment', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
+  },
+
+  login(data) {
+    return this.call('login', data, { skipCache: true, timeoutMs: 120000 });
+  },
+
+  logout(data) {
+    return this.call('logout', data || {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  validateSession() {
+    return this.call('validateSession', {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  listUsers() {
+    return this.call('listUsers', {}, { skipCache: true });
+  },
+
+  saveUser(data) {
+    return this.call('saveUser', data, { skipCache: true });
+  },
+
+  deleteUser(data) {
+    return this.call('deleteUser', data, { skipCache: true });
+  },
+
+};
+
+/* app-auth.js */
+const AuthStore = {
+  KEY: 'renew_session_v1',
+
+  get() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o.token || !o.user) return null;
+      if (o.expiresAt && Date.now() > new Date(o.expiresAt).getTime()) {
+        this.clear();
+        return null;
+      }
+      return o;
+    } catch {
+      return null;
+    }
+  },
+
+  set(session) {
+    localStorage.setItem(this.KEY, JSON.stringify(session));
+  },
+
+  clear() {
+    localStorage.removeItem(this.KEY);
+  },
+
+  getToken() {
+    const s = this.get();
+    return s ? s.token : null;
+  }
+};
+
+const Auth = {
+  _started: false,
+
+  init() {
+    const session = AuthStore.get();
+    if (session) {
+      App.currentUser = session.user;
+      this.showApp();
+      this.updateChrome();
+      return true;
+    }
+    this.showLogin();
+    return false;
+  },
+
+  showLogin() {
+    const screen = document.getElementById('login-screen');
+    const root = document.getElementById('app-root');
+    if (screen) screen.classList.remove('hidden');
+    if (root) root.classList.add('hidden');
+    document.body.classList.add('login-mode');
+  },
+
+  showApp() {
+    const screen = document.getElementById('login-screen');
+    const root = document.getElementById('app-root');
+    if (screen) screen.classList.add('hidden');
+    if (root) root.classList.remove('hidden');
+    document.body.classList.remove('login-mode');
+  },
+
+  updateChrome() {
+    const user = App.currentUser;
+    const badge = document.getElementById('user-badge');
+    const adminBtn = document.getElementById('admin-users-btn');
+    if (badge && user) {
+      const roleLabel = user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+      badge.innerHTML =
+        '<i class="fa-solid fa-user-circle"></i> ' +
+        Utils.escapeHtml(user.displayName || user.username) +
+        ' <span class="text-slate-400 font-normal">(' + roleLabel + ')</span>';
+    }
+    if (adminBtn) {
+      adminBtn.classList.toggle('hidden', !user || user.role !== 'admin');
+    }
+  },
+
+  setLoginLoading(loading) {
+    const btn = document.getElementById('login-submit-btn');
+    if (!btn) return;
+    btn.disabled = loading;
+    if (loading) {
+      btn.dataset.label = btn.textContent;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเข้าสู่ระบบ...';
+    } else {
+      btn.textContent = btn.dataset.label || 'เข้าสู่ระบบ';
+    }
+  },
+
+  async submitLogin() {
+    const username = (document.getElementById('login-username')?.value || '').trim();
+    const password = document.getElementById('login-password')?.value || '';
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-submit-btn');
+
+    if (errEl) errEl.textContent = '';
+    if (!username || !password) {
+      if (errEl) errEl.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+      return;
+    }
+
+    if (!CONFIG?.API_URL?.trim()) {
+      if (errEl) errEl.textContent = 'ยังไม่ได้ตั้งค่า API — ตรวจสอบ config.js';
+      return;
+    }
+
+    this.setLoginLoading(true);
+    try {
+      const res = await Api.login({ username, password });
+      if (!res.token || !res.user) {
+        throw new Error('API ตอบกลับไม่ครบ — Deploy GAS เวอร์ชันล่าสุด (New version)');
+      }
+      AuthStore.set({ token: res.token, user: res.user, expiresAt: res.expiresAt });
+      App.currentUser = res.user;
+      this.showApp();
+      this.updateChrome();
+      if (!Auth._started) {
+        Auth._started = true;
+        loadProjects().catch(onProjectsLoadError);
+      }
+    } catch (err) {
+      console.error('login failed', err);
+      let msg = err.message || 'เข้าสู่ระบบไม่สำเร็จ';
+      if (/Unknown action/i.test(msg)) {
+        msg = 'API ยังไม่มีระบบ login — Deploy GAS → New version แล้วลองใหม่';
+      } else if (/failed to fetch|network/i.test(msg)) {
+        msg = 'เชื่อมต่อ API ไม่ได้ — ตรวจสอบเน็ตหรือ Deploy Web App';
+      }
+      if (errEl) errEl.textContent = msg;
+    } finally {
+      this.setLoginLoading(false);
+    }
+  },
+
+  async logout() {
+    const token = AuthStore.getToken();
+    AuthStore.clear();
+    App.currentUser = null;
+    Auth._started = false;
+    try {
+      if (token) await Api.logout({ sessionToken: token });
+    } catch (_) {}
+    App.projects = [];
+    App.departments = [];
+    DataCache.clear();
+    this.showLogin();
+    const main = document.getElementById('main-content');
+    if (main) main.replaceChildren();
+  },
+
+  forceLogout(message) {
+    AuthStore.clear();
+    App.currentUser = null;
+    Auth._started = false;
+    this.showLogin();
+    const errEl = document.getElementById('login-error');
+    if (errEl && message) errEl.textContent = message;
+  },
+
+  onLoginKeydown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.submitLogin();
+    }
+  }
+};
+
+function onLoginKeydown(e) {
+  Auth.onLoginKeydown(e);
+}
+
+Object.assign(window, {
+  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown
+});
+
+/* app-index.js */
+function rebuildAppIndex() {
+  App.expiryEvents = [];
+  App.projects.forEach(project => {
+    (project.licenses || []).forEach(license => {
+      if (!license.expiryDate) return;
+      App.expiryEvents.push({
+        date: license.expiryDate,
+        project,
+        license,
+        status: Utils.calculateStatus(license.expiryDate, license.alertMonths).status
+      });
+    });
+  });
+}
 
 /* app-departments.js */
 function populateDepartmentSelect(selected) {

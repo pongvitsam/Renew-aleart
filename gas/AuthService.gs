@@ -41,7 +41,6 @@ var AuthService = (function () {
       props.setProperty(SEED_KEY, '1');
       return;
     }
-    if (props.getProperty(SEED_KEY) === '1') return;
 
     var adminUser = CONFIG.DEFAULT_ADMIN || {};
     SheetService.appendRow_(usersSheet_(), {
@@ -142,7 +141,9 @@ var AuthService = (function () {
     if (!(row.active === true || row.active === 'true' || row.active === 1 || row.active === '1')) {
       throw new Error('บัญชีนี้ถูกปิดใช้งาน');
     }
-    if (String(row.passwordHash) !== hashPassword_(password)) {
+    var expected = hashPassword_(password);
+    var stored = String(row.passwordHash || '').trim();
+    if (stored !== expected) {
       throw new Error('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
     }
 

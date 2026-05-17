@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '23';
+const ASSET_V = '24';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -134,8 +134,8 @@ const html = [
   `<${d} id="login-screen" class="fixed inset-0 z-[80] flex items-center justify-center p-4 login-screen-bg">`,
   `<${d} class="login-card w-full max-w-md">`,
   `<${d} class="text-center mb-6"><i class="fa-solid fa-shield-halved text-4xl text-indigo-500"></i><h1 class="text-2xl font-bold mt-2">Renew Aleart</h1><p class="text-sm text-slate-500">เข้าสู่ระบบเพื่อจัดการใบอนุญาต</p></${d}>`,
-  `<label class="block text-sm font-bold mb-1">ชื่อผู้ใช้<input id="login-username" type="text" autocomplete="username" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="Auth.onLoginKeydown(event)"></label>`,
-  `<label class="block text-sm font-bold mb-4">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="Auth.onLoginKeydown(event)"></label>`,
+  `<label class="block text-sm font-bold mb-1">ชื่อผู้ใช้<input id="login-username" type="text" autocomplete="username" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="onLoginKeydown(event)"></label>`,
+  `<label class="block text-sm font-bold mb-4">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="onLoginKeydown(event)"></label>`,
   `<p id="login-error" class="text-sm text-rose-600 mb-3 min-h-[1.25rem]"></p>`,
   `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700">เข้าสู่ระบบ</button>`,
   `</${d}></${d}>`,

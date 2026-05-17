@@ -78,6 +78,18 @@ const Auth = {
     }
   },
 
+  setLoginLoading(loading) {
+    const btn = document.getElementById('login-submit-btn');
+    if (!btn) return;
+    btn.disabled = loading;
+    if (loading) {
+      btn.dataset.label = btn.textContent;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเข้าสู่ระบบ...';
+    } else {
+      btn.textContent = btn.dataset.label || 'เข้าสู่ระบบ';
+    }
+  },
+
   async submitLogin() {
     const username = (document.getElementById('login-username')?.value || '').trim();
     const password = document.getElementById('login-password')?.value || '';
@@ -90,9 +102,17 @@ const Auth = {
       return;
     }
 
-    if (btn) btn.disabled = true;
+    if (!CONFIG?.API_URL?.trim()) {
+      if (errEl) errEl.textContent = 'ยังไม่ได้ตั้งค่า API — ตรวจสอบ config.js';
+      return;
+    }
+
+    this.setLoginLoading(true);
     try {
       const res = await Api.login({ username, password });
+      if (!res.token || !res.user) {
+        throw new Error('API ตอบกลับไม่ครบ — Deploy GAS เวอร์ชันล่าสุด (New version)');
+      }
       AuthStore.set({ token: res.token, user: res.user, expiresAt: res.expiresAt });
       App.currentUser = res.user;
       this.showApp();
@@ -102,9 +122,16 @@ const Auth = {
         loadProjects().catch(onProjectsLoadError);
       }
     } catch (err) {
-      if (errEl) errEl.textContent = err.message || 'เข้าสู่ระบบไม่สำเร็จ';
+      console.error('login failed', err);
+      let msg = err.message || 'เข้าสู่ระบบไม่สำเร็จ';
+      if (/Unknown action/i.test(msg)) {
+        msg = 'API ยังไม่มีระบบ login — Deploy GAS → New version แล้วลองใหม่';
+      } else if (/failed to fetch|network/i.test(msg)) {
+        msg = 'เชื่อมต่อ API ไม่ได้ — ตรวจสอบเน็ตหรือ Deploy Web App';
+      }
+      if (errEl) errEl.textContent = msg;
     } finally {
-      if (btn) btn.disabled = false;
+      this.setLoginLoading(false);
     }
   },
 
@@ -134,10 +161,17 @@ const Auth = {
   },
 
   onLoginKeydown(e) {
-    if (e.key === 'Enter') this.submitLogin();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      this.submitLogin();
+    }
   }
 };
 
+function onLoginKeydown(e) {
+  Auth.onLoginKeydown(e);
+}
+
 Object.assign(window, {
-  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout()
+  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown
 });
