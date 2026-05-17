@@ -20,6 +20,7 @@ function showDashboard() {
   App.currentView = 'dashboard';
   App.currentProjectId = null;
   App.dashboardTab = App.dashboardTab || 'overview';
+  if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
   renderSidebar(true);
 
   document.getElementById('page-title').innerHTML =
@@ -28,8 +29,13 @@ function showDashboard() {
   const content = document.getElementById('main-content');
   content.replaceChildren();
 
+  const hint = document.createElement('div');
+  hint.className = 'page-hint';
+  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
+  content.appendChild(hint);
+
   const tabs = document.createElement('div');
-  tabs.className = 'flex gap-2 mb-6';
+  tabs.className = 'page-tabs';
   ['overview', 'calendar'].forEach(tab => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -132,15 +138,24 @@ function renderProjectsStatusList() {
   const projects = getFilteredDashboardProjects();
   const summary = document.createElement('p');
   summary.className = 'text-xs text-slate-500 mb-3';
-  summary.textContent = 'แสดง ' + projects.length + ' โครงการ · มุมมองรายการ (เหมาะกับหลายร้อยโครงการ)';
+  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อเปิดรายละเอียด';
   wrap.appendChild(summary);
 
   if (!projects.length) {
-    const empty = document.createElement('p');
-    empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed';
-    empty.textContent = App.projects.length
-      ? 'ไม่พบโครงการตามตัวกรอง'
-      : 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    if (App.projects.length) {
+      empty.innerHTML =
+        '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
+        '<p class="empty-state-title">ไม่พบโครงการตามตัวกรอง</p>' +
+        '<p class="empty-state-desc">ลองเปลี่ยนคำค้นหาหรือเลือกสถานะอื่น</p>';
+    } else {
+      empty.innerHTML =
+        '<div class="empty-state-icon"><i class="fa-solid fa-folder-plus"></i></div>' +
+        '<p class="empty-state-title">เริ่มต้นด้วยโครงการแรก</p>' +
+        '<p class="empty-state-desc">เพิ่มโครงการแล้วใส่ใบอนุญาต — ระบบจะช่วยเตือนก่อนหมดอายุ</p>' +
+        '<button type="button" class="btn-primary empty-state-cta" onclick="openProjectModal()"><i class="fa-solid fa-plus mr-1"></i> สร้างโครงการใหม่</button>';
+    }
     wrap.appendChild(empty);
     return wrap;
   }

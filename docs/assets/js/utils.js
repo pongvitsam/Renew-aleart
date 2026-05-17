@@ -123,10 +123,9 @@
     const icon = type === 'success'
       ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>'
       : '<i class="fa-solid fa-circle-exclamation text-rose-500"></i>';
-    toast.className = (type === 'success'
-      ? 'bg-white border-l-4 border-emerald-500'
-      : 'bg-white border-l-4 border-rose-500 text-rose-700') +
-      ' p-4 rounded-r-xl shadow-lg flex items-center gap-3 min-w-[250px] pointer-events-auto';
+    toast.className = 'toast-item ' + (type === 'success'
+      ? 'toast-success'
+      : 'toast-error');
     toast.innerHTML = '<span class="text-xl">' + icon + '</span><span class="text-sm font-bold">' + this.escapeHtml(message) + '</span>';
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3200);

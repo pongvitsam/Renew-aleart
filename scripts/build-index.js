@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '28';
+const ASSET_V = '29';
 const base = '/Renew-aleart';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
@@ -17,8 +17,8 @@ try {
 const d = 'd' + 'iv';
 
 const modal = (id, maxW, inner) =>
-  `<${d} id="${id}" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">` +
-  `<${d} class="bg-white rounded-2xl shadow-2xl w-full ${maxW} max-h-[90vh] flex flex-col">${inner}</${d}></${d}>`;
+  `<${d} id="${id}" class="app-modal fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4">` +
+  `<${d} class="app-modal-panel bg-white rounded-2xl shadow-2xl w-full ${maxW} max-h-[90vh] flex flex-col">${inner}</${d}></${d}>`;
 
 const projectModal = modal('projectModal', 'max-w-lg', `
 <${d} class="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 flex justify-between text-white font-bold"><span id="projectModalTitle">เพิ่มโครงการใหม่</span><button type="button" onclick="closeModal('projectModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
@@ -130,39 +130,43 @@ const html = [
   '</head><body class="text-slate-800 h-screen overflow-hidden login-mode">',
   `<${d} id="login-screen" class="fixed inset-0 z-[80] flex items-center justify-center p-4 login-screen-bg">`,
   `<${d} class="login-card w-full max-w-md">`,
-  `<${d} class="text-center mb-6"><i class="fa-solid fa-shield-halved text-4xl text-indigo-500"></i><h1 class="text-2xl font-bold mt-2">Renew Aleart</h1><p class="text-sm text-slate-500">เข้าสู่ระบบเพื่อจัดการใบอนุญาต</p></${d}>`,
-  `<label class="block text-sm font-bold mb-1">ชื่อผู้ใช้<input id="login-username" type="text" autocomplete="username" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="onLoginKeydown(event)"></label>`,
-  `<label class="block text-sm font-bold mb-4">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="onLoginKeydown(event)"></label>`,
-  `<p id="login-error" class="text-sm text-rose-600 mb-3 min-h-[1.25rem]"></p>`,
-  `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700">เข้าสู่ระบบ</button>`,
+  `<${d} class="login-brand"><span class="login-brand-icon"><i class="fa-solid fa-shield-halved"></i></span></${d}>`,
+  `<h1 class="login-title">ยินดีต้อนรับ</h1>`,
+  `<p class="login-subtitle">ติดตามวันหมดอายุใบอนุญาตและแจ้งเตือนทีมงานได้ในที่เดียว</p>`,
+  `<label class="field-label">ชื่อผู้ใช้<span class="field-hint">ใช้บัญชีที่ได้รับจากผู้ดูแล</span><input id="login-username" type="text" autocomplete="username" class="field-input" placeholder="เช่น admin" onkeydown="onLoginKeydown(event)"></label>`,
+  `<label class="field-label">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="field-input" placeholder="••••••••" onkeydown="onLoginKeydown(event)"></label>`,
+  `<p id="login-error" class="login-error" role="alert"></p>`,
+  `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="btn-login w-full">เข้าสู่ระบบ</button>`,
   `</${d}></${d}>`,
   `<${d} id="app-root" class="app-shell hidden h-screen flex overflow-hidden">`,
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
   `<${d} class="app-mobile-bar md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4 gap-2">` +
   `<span class="text-indigo-600 font-bold truncate"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span>` +
   `<${d} class="flex items-center gap-2 shrink-0">` +
-  `<button type="button" onclick="logout()" class="text-xs font-bold text-rose-600 border border-rose-200 px-2 py-1 rounded-lg">ออก</button>` +
+  `<button type="button" onclick="logout()" class="btn-ghost-logout btn-ghost-logout--compact">ออก</button>` +
   `<button type="button" onclick="toggleSidebar()" class="text-2xl leading-none" aria-label="เมนู"><i class="fa-solid fa-bars"></i></button>` +
   `</${d}></${d}>`,
-  '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
-  `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-lg gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Renew Aleart</${d}>`,
-  `<${d} class="p-4 space-y-2 sidebar-nav">` +
-  `<button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button>` +
-  `<button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button>` +
-  `<button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button>` +
-  `<button type="button" onclick="openTestEmailModalFromNav()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-envelope"></i> ทดสอบอีเมล</button>` +
-  `<button type="button" id="admin-users-btn" onclick="openUserAdminModal()" class="hidden w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้</button>` +
+  '<aside id="sidebar" class="app-sidebar fixed md:static inset-y-0 left-0 w-72 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
+  `<${d} class="sidebar-brand"><i class="fa-solid fa-shield-halved"></i><span>Renew Aleart</span></${d}>`,
+  `<${d} class="sidebar-nav">` +
+  `<p class="sidebar-label">เมนูหลัก</p>` +
+  `<button type="button" data-nav="dashboard" onclick="showDashboard()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-text">ภาพรวม</span></button>` +
+  `<button type="button" data-nav="create" onclick="openProjectModal()" class="nav-item nav-item-accent"><span class="nav-icon"><i class="fa-solid fa-plus"></i></span><span class="nav-text">สร้างโครงการใหม่</span></button>` +
+  `<p class="sidebar-label">เครื่องมือ</p>` +
+  `<button type="button" data-nav="dept" onclick="openDepartmentModal()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-building"></i></span><span class="nav-text">จัดการแผนก</span></button>` +
+  `<button type="button" data-nav="email" onclick="openTestEmailModalFromNav()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-envelope"></i></span><span class="nav-text">ทดสอบอีเมล</span></button>` +
+  `<button type="button" id="admin-users-btn" data-nav="users" onclick="openUserAdminModal()" class="nav-item hidden"><span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span><span class="nav-text">จัดการผู้ใช้</span></button>` +
   `</${d}>`,
-  `<${d} class="px-4 pb-3"><input type="text" id="project-search" placeholder="ค้นหาโครงการ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
+  `<${d} class="sidebar-search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="project-search" placeholder="ค้นหาโครงการ..." class="sidebar-search"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
   `<${d} class="p-4 border-t border-slate-800 space-y-2">` +
   `<p id="sidebar-user-label" class="text-xs text-slate-400 truncate px-1"></p>` +
-  `<button type="button" onclick="logout()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700 font-bold hover:bg-rose-950 hover:border-rose-800 hover:text-rose-300"><i class="fa-solid fa-right-from-bracket mr-1"></i> ออกจากระบบ</button>` +
+  `<button type="button" onclick="logout()" class="nav-item nav-item-logout w-full"><span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span><span class="nav-text">ออกจากระบบ</span></button>` +
   `<p class="text-xs text-slate-500 text-center">&copy; Pongvit Y. 2026 License</p></${d}>`,
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
   '<main class="app-main flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
-  `<header class="app-topbar hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><${d} class="flex items-center gap-3"><span id="user-badge" class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" id="logout-btn" onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-slate-200 bg-white">ออกจากระบบ</button></${d}></header>`,
+  `<header class="app-topbar hidden md:flex h-16 items-center justify-between px-6 md:px-8 glass-panel"><h2 id="page-title" class="page-heading">ภาพรวมระบบ</h2><${d} class="topbar-actions"><span id="user-badge" class="user-chip"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" id="logout-btn" onclick="logout()" class="btn-ghost-logout">ออกจากระบบ</button></${d}></header>`,
   `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
   '</main>',
   `<${d} id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-3 pointer-events-none"></${d}>`,

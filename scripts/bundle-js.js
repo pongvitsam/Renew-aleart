@@ -12,6 +12,7 @@ const files = [
   'app-index.js',
   'app-departments.js',
   'app-users.js',
+  'app-nav.js',
   'app-sidebar.js',
   'app-date-picker.js',
   'app-calendar.js',

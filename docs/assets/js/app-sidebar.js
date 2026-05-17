@@ -17,8 +17,10 @@ function renderSidebar(light) {
   const filtered = App.projects.filter(p => p.name.toLowerCase().includes(searchTerm));
   if (!filtered.length) {
     const empty = document.createElement('p');
-    empty.className = 'text-slate-500 text-xs text-center mt-6 py-6 bg-slate-900/30 rounded-xl border border-slate-800/50';
-    empty.textContent = searchTerm ? 'ไม่พบโครงการที่ค้นหา' : 'ยังไม่มีโครงการ';
+    empty.className = 'sidebar-empty';
+    empty.innerHTML = searchTerm
+      ? '<i class="fa-solid fa-magnifying-glass"></i><span>ไม่พบโครงการที่ค้นหา</span>'
+      : '<i class="fa-solid fa-seedling"></i><span>ยังไม่มีโครงการ — กด「สร้างโครงการใหม่」</span>';
     container.appendChild(empty);
     return;
   }

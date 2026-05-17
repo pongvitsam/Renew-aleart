@@ -170,10 +170,9 @@ const DataCache = {
     const icon = type === 'success'
       ? '<i class="fa-solid fa-circle-check text-emerald-500"></i>'
       : '<i class="fa-solid fa-circle-exclamation text-rose-500"></i>';
-    toast.className = (type === 'success'
-      ? 'bg-white border-l-4 border-emerald-500'
-      : 'bg-white border-l-4 border-rose-500 text-rose-700') +
-      ' p-4 rounded-r-xl shadow-lg flex items-center gap-3 min-w-[250px] pointer-events-auto';
+    toast.className = 'toast-item ' + (type === 'success'
+      ? 'toast-success'
+      : 'toast-error');
     toast.innerHTML = '<span class="text-xl">' + icon + '</span><span class="text-sm font-bold">' + this.escapeHtml(message) + '</span>';
     container.appendChild(toast);
     setTimeout(() => toast.remove(), 3200);
@@ -973,6 +972,7 @@ const Auth = {
       App.currentUser = session.user;
       this.showApp();
       this.updateChrome();
+      if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
       return true;
     }
     this.showLogin();
@@ -1029,7 +1029,7 @@ const Auth = {
     btn.disabled = loading;
     if (loading) {
       btn.dataset.label = btn.textContent;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเข้าสู่ระบบ...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังเข้าสู่ระบบ...';
     } else {
       btn.textContent = btn.dataset.label || 'เข้าสู่ระบบ';
     }
@@ -1062,6 +1062,7 @@ const Auth = {
       App.currentUser = res.user;
       this.showApp();
       this.updateChrome();
+      if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
       if (!Auth._started) {
         Auth._started = true;
         loadProjects().catch(onProjectsLoadError);
@@ -1361,6 +1362,15 @@ Object.assign(window, {
   openUserAdminModal, saveAppUser, deleteAppUser, resetUserForm
 });
 
+/* app-nav.js */
+function updateSidebarNav(view) {
+  document.querySelectorAll('.sidebar-nav [data-nav]').forEach(btn => {
+    btn.classList.toggle('nav-active', btn.dataset.nav === view);
+  });
+}
+
+window.updateSidebarNav = updateSidebarNav;
+
 /* app-sidebar.js */
 let _sidebarSearchBound = false;
 
@@ -1381,8 +1391,10 @@ function renderSidebar(light) {
   const filtered = App.projects.filter(p => p.name.toLowerCase().includes(searchTerm));
   if (!filtered.length) {
     const empty = document.createElement('p');
-    empty.className = 'text-slate-500 text-xs text-center mt-6 py-6 bg-slate-900/30 rounded-xl border border-slate-800/50';
-    empty.textContent = searchTerm ? 'ไม่พบโครงการที่ค้นหา' : 'ยังไม่มีโครงการ';
+    empty.className = 'sidebar-empty';
+    empty.innerHTML = searchTerm
+      ? '<i class="fa-solid fa-magnifying-glass"></i><span>ไม่พบโครงการที่ค้นหา</span>'
+      : '<i class="fa-solid fa-seedling"></i><span>ยังไม่มีโครงการ — กด「สร้างโครงการใหม่」</span>';
     container.appendChild(empty);
     return;
   }
@@ -2141,6 +2153,7 @@ function showDashboard() {
   App.currentView = 'dashboard';
   App.currentProjectId = null;
   App.dashboardTab = App.dashboardTab || 'overview';
+  if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
   renderSidebar(true);
 
   document.getElementById('page-title').innerHTML =
@@ -2149,8 +2162,13 @@ function showDashboard() {
   const content = document.getElementById('main-content');
   content.replaceChildren();
 
+  const hint = document.createElement('div');
+  hint.className = 'page-hint';
+  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
+  content.appendChild(hint);
+
   const tabs = document.createElement('div');
-  tabs.className = 'flex gap-2 mb-6';
+  tabs.className = 'page-tabs';
   ['overview', 'calendar'].forEach(tab => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -2253,15 +2271,24 @@ function renderProjectsStatusList() {
   const projects = getFilteredDashboardProjects();
   const summary = document.createElement('p');
   summary.className = 'text-xs text-slate-500 mb-3';
-  summary.textContent = 'แสดง ' + projects.length + ' โครงการ · มุมมองรายการ (เหมาะกับหลายร้อยโครงการ)';
+  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อเปิดรายละเอียด';
   wrap.appendChild(summary);
 
   if (!projects.length) {
-    const empty = document.createElement('p');
-    empty.className = 'text-center py-12 text-slate-500 bg-white rounded-2xl border border-dashed';
-    empty.textContent = App.projects.length
-      ? 'ไม่พบโครงการตามตัวกรอง'
-      : 'ยังไม่มีโครงการ — กดสร้างโครงการใหม่';
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    if (App.projects.length) {
+      empty.innerHTML =
+        '<div class="empty-state-icon"><i class="fa-solid fa-magnifying-glass"></i></div>' +
+        '<p class="empty-state-title">ไม่พบโครงการตามตัวกรอง</p>' +
+        '<p class="empty-state-desc">ลองเปลี่ยนคำค้นหาหรือเลือกสถานะอื่น</p>';
+    } else {
+      empty.innerHTML =
+        '<div class="empty-state-icon"><i class="fa-solid fa-folder-plus"></i></div>' +
+        '<p class="empty-state-title">เริ่มต้นด้วยโครงการแรก</p>' +
+        '<p class="empty-state-desc">เพิ่มโครงการแล้วใส่ใบอนุญาต — ระบบจะช่วยเตือนก่อนหมดอายุ</p>' +
+        '<button type="button" class="btn-primary empty-state-cta" onclick="openProjectModal()"><i class="fa-solid fa-plus mr-1"></i> สร้างโครงการใหม่</button>';
+    }
     wrap.appendChild(empty);
     return wrap;
   }
@@ -2390,6 +2417,7 @@ window.showDashboard = showDashboard;
 function renderProjectView(projectId) {
   App.currentView = 'project';
   App.currentProjectId = projectId;
+  if (typeof updateSidebarNav === 'function') updateSidebarNav('project');
   if (window.innerWidth < 768) {
     document.getElementById('sidebar').classList.add('-translate-x-full');
     document.getElementById('sidebar-overlay').classList.add('hidden');

@@ -40,6 +40,7 @@ const Auth = {
       App.currentUser = session.user;
       this.showApp();
       this.updateChrome();
+      if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
       return true;
     }
     this.showLogin();
@@ -96,7 +97,7 @@ const Auth = {
     btn.disabled = loading;
     if (loading) {
       btn.dataset.label = btn.textContent;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังเข้าสู่ระบบ...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังเข้าสู่ระบบ...';
     } else {
       btn.textContent = btn.dataset.label || 'เข้าสู่ระบบ';
     }
@@ -129,6 +130,7 @@ const Auth = {
       App.currentUser = res.user;
       this.showApp();
       this.updateChrome();
+      if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
       if (!Auth._started) {
         Auth._started = true;
         loadProjects().catch(onProjectsLoadError);
