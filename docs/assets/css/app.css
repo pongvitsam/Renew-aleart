@@ -1,3 +1,30 @@
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/Renew-aleart/assets/fonts/sarabun-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/Renew-aleart/assets/fonts/sarabun-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Sarabun';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/Renew-aleart/assets/fonts/sarabun-700.woff2') format('woff2');
+}
+
+body.app-shell,
+body.login-mode {
+  font-family: 'Sarabun', 'Segoe UI', Tahoma, sans-serif;
+}
+
 :root {
   --bg: #f1f5f9;
   --card: #ffffff;

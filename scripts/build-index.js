@@ -5,10 +5,10 @@ const { execSync } = require('child_process');
 const configSrc = fs.readFileSync(path.join(__dirname, '..', 'docs', 'assets', 'js', 'config.js'), 'utf8');
 const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
-  '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
-  'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
-  'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '24';
+  '<script>(function(){var K="renew_payload_v3";' +
+  'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
+const ASSET_V = '25';
+const base = '/Renew-aleart';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -119,17 +119,14 @@ const html = [
   '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
   '<title>Renew Aleart</title>',
   bootInline,
+  '<link rel="icon" href="' + base + '/favicon.svg" type="image/svg+xml">',
   '<link rel="preconnect" href="https://script.google.com" crossorigin>',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<link rel="dns-prefetch" href="https://script.google.com">',
   '<link rel="dns-prefetch" href="https://script.googleusercontent.com">',
-  '<link rel="preload" href="/Renew-aleart/data/payload.json" as="fetch" crossorigin>',
-  '<link rel="stylesheet" href="/Renew-aleart/assets/css/app.css">',
-  '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" media="print" onload="this.media=\'all\'">',
-  '<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>',
-  '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet" media="print" onload="this.media=\'all\'">',
-  '<script defer src="https://cdn.tailwindcss.com"></script>',
-  '<script defer>document.addEventListener("DOMContentLoaded",function(){if(window.tailwind)tailwind.config={theme:{extend:{fontFamily:{sans:["Sarabun","sans-serif"]}}}};});</script>',
+  '<link rel="stylesheet" href="' + base + '/assets/css/tailwind.css?v=' + ASSET_V + '">',
+  '<link rel="stylesheet" href="' + base + '/assets/css/app.css?v=' + ASSET_V + '">',
+  '<link rel="stylesheet" href="' + base + '/assets/vendor/fontawesome/css/all.min.css?v=' + ASSET_V + '">',
   '</head><body class="text-slate-800 h-screen overflow-hidden login-mode">',
   `<${d} id="login-screen" class="fixed inset-0 z-[80] flex items-center justify-center p-4 login-screen-bg">`,
   `<${d} class="login-card w-full max-w-md">`,

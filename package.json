@@ -1,0 +1,11 @@
+{
+  "name": "renew-aleart",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./docs/assets/css/tailwind-input.css -o ./docs/assets/css/tailwind.css --minify",
+    "build:index": "npm run build:css && node scripts/build-index.js"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17"
+  }
+}
