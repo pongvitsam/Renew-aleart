@@ -26,7 +26,7 @@ var AuthService = (function () {
   }
 
   function ensureUsersSheet_() {
-    var ss = SheetService.ensureInitialized();
+    var ss = getSpreadsheet_();
     var sheet = ss.getSheetByName(usersSheet_());
     if (!sheet) {
       SheetService.ensureSheet_(ss, usersSheet_(), USER_HEADERS);

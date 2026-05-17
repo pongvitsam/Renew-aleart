@@ -43,7 +43,13 @@ const Auth = {
       return true;
     }
     this.showLogin();
+    this.warmupApi();
     return false;
+  },
+
+  warmupApi() {
+    if (!CONFIG?.API_URL?.trim()) return;
+    Api.ping().catch(() => {});
   },
 
   showLogin() {

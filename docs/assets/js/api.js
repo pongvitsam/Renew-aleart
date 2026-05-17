@@ -75,10 +75,11 @@ const Api = {
     return { success: true, projects: [], departments: [], _empty: true };
   },
 
-  async fetchWithTimeout(url, options, timeoutMs) {
+  async fetchWithTimeout(url, options, timeoutMs, fetchOpts = {}) {
     const ms = timeoutMs || this.TIMEOUT_MS;
     let lastErr;
-    for (let attempt = 0; attempt <= this.MAX_RETRIES; attempt++) {
+    const maxRetries = fetchOpts.maxRetries !== undefined ? fetchOpts.maxRetries : this.MAX_RETRIES;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), ms);
       try {
@@ -90,7 +91,7 @@ const Api = {
         lastErr = err;
         const retryable = err.name === 'AbortError' ||
           (err.message && /failed to fetch|network/i.test(err.message));
-        if (attempt < this.MAX_RETRIES && retryable && ms >= 10000) {
+        if (attempt < maxRetries && retryable && ms >= 10000) {
           await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
           continue;
         }
@@ -143,7 +144,7 @@ const Api = {
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, data: payload })
-    }, timeout);
+    }, timeout, { maxRetries: opts.maxRetries });
 
     const text = await response.text();
     let json;
@@ -274,7 +275,14 @@ const Api = {
   },
 
   login(data) {
-    return this.call('login', data, { skipCache: true, timeoutMs: 120000 });
+    return this.call('login', data, { skipCache: true, timeoutMs: 90000, maxRetries: 0 });
+  },
+
+  ping() {
+    const apiUrl = (CONFIG.API_URL || '').trim();
+    if (!apiUrl) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API_URL'));
+    const url = apiUrl + (apiUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=ping';
+    return this.fetchJsonWithTimeout(url, 25000);
   },
 
   logout(data) {

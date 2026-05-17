@@ -73,10 +73,10 @@ var SheetService = (function () {
       props.setProperty(SCHEMA_READY_KEY_, '1');
     }
     migrateSheets_(ss);
+    ssInstance_ = ss;
     if (typeof AuthService !== 'undefined' && AuthService.ensureUsersSheet_) {
       AuthService.ensureUsersSheet_();
     }
-    ssInstance_ = ss;
     return ss;
   }
 
