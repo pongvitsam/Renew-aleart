@@ -149,7 +149,8 @@ var SheetService = (function () {
       expiryDate: formatDateValue_(l.expiryDate),
       alertMonths: Number(l.alertMonths) || 3,
       driveUrl: l.driveUrl || '',
-      status: l.status || '-'
+      status: l.status || '-',
+      steps: parseJson_(l.steps, CONFIG.DEFAULT_STEPS.slice())
     };
   }
 
@@ -217,7 +218,10 @@ var SheetService = (function () {
     if (!licRow) throw new Error('ไม่พบใบอนุญาต');
 
     var historyRows = readTable_(CONFIG.SHEETS.HISTORY);
-    var historyByLicense = buildHistoryMap_(historyRows);
+    var filtered = historyRows.filter(function (h) {
+      return String(h.licenseId) === String(licenseId);
+    });
+    var historyByLicense = buildHistoryMap_(filtered);
     return mapLicenseRow_(licRow, historyByLicense, true);
   }
 

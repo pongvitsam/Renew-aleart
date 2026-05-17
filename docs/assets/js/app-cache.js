@@ -13,6 +13,12 @@ const DataCache = {
     }
   },
 
+  getAgeMs() {
+    const o = this._read();
+    if (!o) return null;
+    return Date.now() - o.t;
+  },
+
   get() {
     const o = this._read();
     if (!o) return null;

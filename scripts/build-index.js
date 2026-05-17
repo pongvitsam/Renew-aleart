@@ -7,8 +7,13 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '30';
+const ASSET_V = '31';
 const base = '/Renew-aleart';
+const snapshotUrl = base + '/data/payload.json';
+const snapshotPrefetch =
+  '<link rel="preload" href="' + snapshotUrl + '?v=' + ASSET_V + '" as="fetch" crossorigin>' +
+  '<script>(function(){var u="' + snapshotUrl + '?v=' + ASSET_V + '";' +
+  'try{window.__SNAPSHOT_PREFETCH__=fetch(u).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});}catch(e){}})();</script>';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -119,6 +124,7 @@ const html = [
   '<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">',
   '<title>Renew Aleart</title>',
   bootInline,
+  snapshotPrefetch,
   '<link rel="icon" href="' + base + '/favicon.svg" type="image/svg+xml">',
   '<link rel="preconnect" href="https://script.google.com" crossorigin>',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',

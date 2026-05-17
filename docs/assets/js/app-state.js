@@ -14,6 +14,13 @@ function applyServerData(res) {
   Api.applyPayload(res);
 }
 
+function paintProjectsUi() {
+  if (!hasUsableProjectData()) return false;
+  refreshCurrentView();
+  hideSetupBanner();
+  return true;
+}
+
 function onProjectsLoaded(res) {
   applyServerData(res);
   hideSetupBanner();
@@ -73,14 +80,15 @@ async function loadProjects() {
 
     if (cached) {
       applyServerData({ success: true, ...cached });
-      refreshCurrentView();
-      hideSetupBanner();
-      if (stalePack?.stale) showSyncIndicator();
-      App._syncing = true;
-      Api.syncFromApiInBackground()
-        .then(onProjectsLoaded)
-        .catch(onProjectsLoadError)
-        .finally(() => { App._syncing = false; });
+      if (paintProjectsUi()) {
+        if (stalePack?.stale) showSyncIndicator();
+        Api.scheduleDeferredSync(!!stalePack?.stale);
+      }
+      return;
+    }
+
+    if (paintProjectsUi()) {
+      Api.scheduleDeferredSync(true);
       return;
     }
 
@@ -91,12 +99,9 @@ async function loadProjects() {
     App._syncing = true;
     const res = await Api.loadInitialPayload();
     onProjectsLoaded(res);
-    if (!res._fromApi) {
+    if (!res._fromApi && !res._fromCache) {
       showSyncIndicator();
-      Api.syncFromApiInBackground()
-        .then(onProjectsLoaded)
-        .catch(onProjectsLoadError)
-        .finally(() => { App._syncing = false; });
+      Api.scheduleDeferredSync(true);
     } else {
       App._syncing = false;
     }

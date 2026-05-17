@@ -14,6 +14,12 @@ const DataCache = {
     }
   },
 
+  getAgeMs() {
+    const o = this._read();
+    if (!o) return null;
+    return Date.now() - o.t;
+  },
+
   get() {
     const o = this._read();
     if (!o) return null;
@@ -88,7 +94,7 @@ const DataCache = {
     return { safe, warning, expired, total: (licenses || []).length };
   },
 
-  getProjectStatus(project) {
+  computeProjectStatus(project) {
     const licenses = project.licenses || [];
     const counts = this.licenseCounts(licenses);
     if (!counts.total) {
@@ -101,6 +107,13 @@ const DataCache = {
       return { status: 'warning', text: 'ใกล้หมดอายุ ' + counts.warning, pill: 'warning', border: 'status-warning', counts };
     }
     return { status: 'safe', text: 'ปกติ', pill: 'safe', border: 'status-safe', counts };
+  },
+
+  getProjectStatus(project) {
+    if (!project) return this.computeProjectStatus({ licenses: [] });
+    const cached = App._projectStatusCache && App._projectStatusCache[project.id];
+    if (cached) return cached;
+    return this.computeProjectStatus(project);
   },
 
   /** ลำดับความสำคัญ: หมดอายุ(0) → ใกล้หมดอายุ(1) → ปกติ(2) → ไม่มีใบอนุญาต(3) */
@@ -473,6 +486,13 @@ function applyServerData(res) {
   Api.applyPayload(res);
 }
 
+function paintProjectsUi() {
+  if (!hasUsableProjectData()) return false;
+  refreshCurrentView();
+  hideSetupBanner();
+  return true;
+}
+
 function onProjectsLoaded(res) {
   applyServerData(res);
   hideSetupBanner();
@@ -532,14 +552,15 @@ async function loadProjects() {
 
     if (cached) {
       applyServerData({ success: true, ...cached });
-      refreshCurrentView();
-      hideSetupBanner();
-      if (stalePack?.stale) showSyncIndicator();
-      App._syncing = true;
-      Api.syncFromApiInBackground()
-        .then(onProjectsLoaded)
-        .catch(onProjectsLoadError)
-        .finally(() => { App._syncing = false; });
+      if (paintProjectsUi()) {
+        if (stalePack?.stale) showSyncIndicator();
+        Api.scheduleDeferredSync(!!stalePack?.stale);
+      }
+      return;
+    }
+
+    if (paintProjectsUi()) {
+      Api.scheduleDeferredSync(true);
       return;
     }
 
@@ -550,12 +571,9 @@ async function loadProjects() {
     App._syncing = true;
     const res = await Api.loadInitialPayload();
     onProjectsLoaded(res);
-    if (!res._fromApi) {
+    if (!res._fromApi && !res._fromCache) {
       showSyncIndicator();
-      Api.syncFromApiInBackground()
-        .then(onProjectsLoaded)
-        .catch(onProjectsLoadError)
-        .finally(() => { App._syncing = false; });
+      Api.scheduleDeferredSync(true);
     } else {
       App._syncing = false;
     }
@@ -640,11 +658,14 @@ const Api = {
     };
   },
 
-  async fetchJsonWithTimeout(url, timeoutMs) {
+  async fetchJsonWithTimeout(url, timeoutMs, opts = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      const res = await fetch(url, {
+        signal: controller.signal,
+        cache: opts.cache || 'no-store'
+      });
       clearTimeout(timer);
       if (!res.ok) return null;
       return await res.json();
@@ -667,8 +688,9 @@ const Api = {
   },
 
   async fetchSnapshot(timeoutMs) {
-    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
-    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
+    const url = this.getSnapshotUrl() + '?v=' + (typeof ASSET_V !== 'undefined' ? ASSET_V : '') +
+      '&t=' + Math.floor(Date.now() / 600000);
+    const data = await this.fetchJsonWithTimeout(url, timeoutMs, { cache: 'default' });
     return this.normalizeSnapshot(data);
   },
 
@@ -794,21 +816,66 @@ const Api = {
     return res;
   },
 
-  scheduleBackgroundRefresh() {
-    clearTimeout(this._refreshTimer);
-    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
+  payloadFingerprint(data) {
+    if (!data || !Array.isArray(data.projects)) return '';
+    let s = data.projects.length + '|' + (data.departments?.length || 0);
+    for (let i = 0; i < data.projects.length; i++) {
+      const p = data.projects[i];
+      s += ';' + p.id + ':' + (p.licenses?.length || 0);
+    }
+    return s;
   },
 
-  syncFromApiInBackground() {
-    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
+  shouldDeferSync(force) {
+    if (force) return true;
+    const minAge = CONFIG.SYNC_MIN_AGE_MS || 300000;
+    const age = DataCache.getAgeMs();
+    return age == null || age >= minAge;
+  },
+
+  scheduleDeferredSync(force) {
+    if (!this.shouldDeferSync(force)) return;
+    clearTimeout(this._deferredSyncTimer);
+    const run = () => {
+      this.syncFromApiInBackground({ force: !!force }).catch(() => {});
+    };
+    if (typeof requestIdleCallback === 'function') {
+      this._deferredSyncTimer = setTimeout(() => {
+        requestIdleCallback(run, { timeout: 2500 });
+      }, 400);
+    } else {
+      this._deferredSyncTimer = setTimeout(run, 1200);
+    }
+  },
+
+  scheduleBackgroundRefresh() {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground({ force: true }), 400);
+  },
+
+  syncFromApiInBackground(opts = {}) {
+    if (App._syncInFlight) return App._syncInFlight;
+    const prevFp = this.payloadFingerprint({
+      projects: App.projects,
+      departments: App.departments
+    });
+    App._syncInFlight = this.call('getProjects', {}, {
+      skipCache: true,
+      timeoutMs: opts.force ? 120000 : 45000
+    })
       .then(res => {
+        const nextFp = this.payloadFingerprint(res);
         this.applyPayload(res);
         DataCache.set({ projects: res.projects, departments: res.departments });
         hideSyncIndicator();
-        refreshCurrentView();
+        if (nextFp !== prevFp && typeof refreshCurrentView === 'function') {
+          refreshCurrentView();
+        }
         return res;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { App._syncInFlight = null; });
+    return App._syncInFlight;
   },
 
   refreshInBackground() {
@@ -1125,7 +1192,9 @@ Object.assign(window, {
 /* app-index.js */
 function rebuildAppIndex() {
   App.expiryEvents = [];
+  App._projectStatusCache = Object.create(null);
   App.projects.forEach(project => {
+    App._projectStatusCache[project.id] = Utils.computeProjectStatus(project);
     (project.licenses || []).forEach(license => {
       if (!license.expiryDate) return;
       App.expiryEvents.push({
@@ -1922,7 +1991,7 @@ async function renderTimeline(projectId, licenseId) {
   openModal('timelineModal');
   paintTimelineModal(license);
 
-  const needsDetail = !license.steps?.length || !Array.isArray(license.history);
+  const needsDetail = !Array.isArray(license.history);
   if (!needsDetail) return;
 
   license._historyLoading = true;
@@ -2249,9 +2318,10 @@ function buildDashboardToolbar() {
 function getFilteredDashboardProjects() {
   const term = (App._dashboardSearch || '').trim().toLowerCase();
   let list = Utils.sortProjectsByPriority([...App.projects]);
+  const filterStatus = App.dashboardStatusFilter;
 
-  if (App.dashboardStatusFilter !== 'all') {
-    list = list.filter(p => Utils.getProjectStatus(p).status === App.dashboardStatusFilter);
+  if (filterStatus !== 'all') {
+    list = list.filter(p => Utils.getProjectStatus(p).status === filterStatus);
   }
 
   if (term) {
@@ -2295,8 +2365,14 @@ function renderProjectsStatusList() {
 
   if (App.dashboardStatusFilter === 'all') {
     let globalRank = 0;
+    const byStatus = {};
+    projects.forEach(p => {
+      const st = Utils.getProjectStatus(p).status;
+      if (!byStatus[st]) byStatus[st] = [];
+      byStatus[st].push(p);
+    });
     DASHBOARD_PRIORITY_GROUPS.forEach(group => {
-      const inGroup = projects.filter(p => Utils.getProjectStatus(p).status === group.status);
+      const inGroup = byStatus[group.status] || [];
       if (!inGroup.length) return;
       globalRank = appendStatusListSection(wrap, group, inGroup, globalRank);
     });

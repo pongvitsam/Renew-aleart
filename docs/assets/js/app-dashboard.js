@@ -116,9 +116,10 @@ function buildDashboardToolbar() {
 function getFilteredDashboardProjects() {
   const term = (App._dashboardSearch || '').trim().toLowerCase();
   let list = Utils.sortProjectsByPriority([...App.projects]);
+  const filterStatus = App.dashboardStatusFilter;
 
-  if (App.dashboardStatusFilter !== 'all') {
-    list = list.filter(p => Utils.getProjectStatus(p).status === App.dashboardStatusFilter);
+  if (filterStatus !== 'all') {
+    list = list.filter(p => Utils.getProjectStatus(p).status === filterStatus);
   }
 
   if (term) {
@@ -162,8 +163,14 @@ function renderProjectsStatusList() {
 
   if (App.dashboardStatusFilter === 'all') {
     let globalRank = 0;
+    const byStatus = {};
+    projects.forEach(p => {
+      const st = Utils.getProjectStatus(p).status;
+      if (!byStatus[st]) byStatus[st] = [];
+      byStatus[st].push(p);
+    });
     DASHBOARD_PRIORITY_GROUPS.forEach(group => {
-      const inGroup = projects.filter(p => Utils.getProjectStatus(p).status === group.status);
+      const inGroup = byStatus[group.status] || [];
       if (!inGroup.length) return;
       globalRank = appendStatusListSection(wrap, group, inGroup, globalRank);
     });

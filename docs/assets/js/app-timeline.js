@@ -115,7 +115,7 @@ async function renderTimeline(projectId, licenseId) {
   openModal('timelineModal');
   paintTimelineModal(license);
 
-  const needsDetail = !license.steps?.length || !Array.isArray(license.history);
+  const needsDetail = !Array.isArray(license.history);
   if (!needsDetail) return;
 
   license._historyLoading = true;

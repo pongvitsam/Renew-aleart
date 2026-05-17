@@ -41,7 +41,7 @@
     return { safe, warning, expired, total: (licenses || []).length };
   },
 
-  getProjectStatus(project) {
+  computeProjectStatus(project) {
     const licenses = project.licenses || [];
     const counts = this.licenseCounts(licenses);
     if (!counts.total) {
@@ -54,6 +54,13 @@
       return { status: 'warning', text: 'ใกล้หมดอายุ ' + counts.warning, pill: 'warning', border: 'status-warning', counts };
     }
     return { status: 'safe', text: 'ปกติ', pill: 'safe', border: 'status-safe', counts };
+  },
+
+  getProjectStatus(project) {
+    if (!project) return this.computeProjectStatus({ licenses: [] });
+    const cached = App._projectStatusCache && App._projectStatusCache[project.id];
+    if (cached) return cached;
+    return this.computeProjectStatus(project);
   },
 
   /** ลำดับความสำคัญ: หมดอายุ(0) → ใกล้หมดอายุ(1) → ปกติ(2) → ไม่มีใบอนุญาต(3) */

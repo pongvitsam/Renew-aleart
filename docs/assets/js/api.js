@@ -18,11 +18,14 @@ const Api = {
     };
   },
 
-  async fetchJsonWithTimeout(url, timeoutMs) {
+  async fetchJsonWithTimeout(url, timeoutMs, opts = {}) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+      const res = await fetch(url, {
+        signal: controller.signal,
+        cache: opts.cache || 'no-store'
+      });
       clearTimeout(timer);
       if (!res.ok) return null;
       return await res.json();
@@ -45,8 +48,9 @@ const Api = {
   },
 
   async fetchSnapshot(timeoutMs) {
-    const url = this.getSnapshotUrl() + '?t=' + Math.floor(Date.now() / 600000);
-    const data = await this.fetchJsonWithTimeout(url, timeoutMs);
+    const url = this.getSnapshotUrl() + '?v=' + (typeof ASSET_V !== 'undefined' ? ASSET_V : '') +
+      '&t=' + Math.floor(Date.now() / 600000);
+    const data = await this.fetchJsonWithTimeout(url, timeoutMs, { cache: 'default' });
     return this.normalizeSnapshot(data);
   },
 
@@ -172,21 +176,66 @@ const Api = {
     return res;
   },
 
-  scheduleBackgroundRefresh() {
-    clearTimeout(this._refreshTimer);
-    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground(), 400);
+  payloadFingerprint(data) {
+    if (!data || !Array.isArray(data.projects)) return '';
+    let s = data.projects.length + '|' + (data.departments?.length || 0);
+    for (let i = 0; i < data.projects.length; i++) {
+      const p = data.projects[i];
+      s += ';' + p.id + ':' + (p.licenses?.length || 0);
+    }
+    return s;
   },
 
-  syncFromApiInBackground() {
-    return this.call('getProjects', {}, { skipCache: true, timeoutMs: 120000 })
+  shouldDeferSync(force) {
+    if (force) return true;
+    const minAge = CONFIG.SYNC_MIN_AGE_MS || 300000;
+    const age = DataCache.getAgeMs();
+    return age == null || age >= minAge;
+  },
+
+  scheduleDeferredSync(force) {
+    if (!this.shouldDeferSync(force)) return;
+    clearTimeout(this._deferredSyncTimer);
+    const run = () => {
+      this.syncFromApiInBackground({ force: !!force }).catch(() => {});
+    };
+    if (typeof requestIdleCallback === 'function') {
+      this._deferredSyncTimer = setTimeout(() => {
+        requestIdleCallback(run, { timeout: 2500 });
+      }, 400);
+    } else {
+      this._deferredSyncTimer = setTimeout(run, 1200);
+    }
+  },
+
+  scheduleBackgroundRefresh() {
+    clearTimeout(this._refreshTimer);
+    this._refreshTimer = setTimeout(() => this.syncFromApiInBackground({ force: true }), 400);
+  },
+
+  syncFromApiInBackground(opts = {}) {
+    if (App._syncInFlight) return App._syncInFlight;
+    const prevFp = this.payloadFingerprint({
+      projects: App.projects,
+      departments: App.departments
+    });
+    App._syncInFlight = this.call('getProjects', {}, {
+      skipCache: true,
+      timeoutMs: opts.force ? 120000 : 45000
+    })
       .then(res => {
+        const nextFp = this.payloadFingerprint(res);
         this.applyPayload(res);
         DataCache.set({ projects: res.projects, departments: res.departments });
         hideSyncIndicator();
-        refreshCurrentView();
+        if (nextFp !== prevFp && typeof refreshCurrentView === 'function') {
+          refreshCurrentView();
+        }
         return res;
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => { App._syncInFlight = null; });
+    return App._syncInFlight;
   },
 
   refreshInBackground() {
