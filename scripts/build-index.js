@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '22';
+const ASSET_V = '23';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -91,7 +91,6 @@ const userAdminModal = modal('userAdminModal', 'max-w-lg', `
 <label class="text-xs font-bold flex items-end gap-2 pb-2"><input type="checkbox" id="user-form-active" checked class="rounded"> เปิดใช้งาน</label></${d}>
 <${d} class="flex gap-2"><button type="button" onclick="resetUserForm()" class="flex-1 border py-2 rounded-xl text-sm font-bold">ล้างฟอร์ม</button><button type="button" onclick="saveAppUser()" class="flex-[2] bg-indigo-600 text-white py-2 rounded-xl text-sm font-bold">บันทึกผู้ใช้</button></${d}>
 </${d}>
-<p class="text-xs text-slate-500">ผู้ดูแลเริ่มต้น: admin / 1234 (สร้างอัตโนมัติครั้งแรก)</p>
 <${d} id="user-admin-list" class="space-y-2"></${d}>
 </${d}>`);
 
@@ -139,7 +138,6 @@ const html = [
   `<label class="block text-sm font-bold mb-4">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="Auth.onLoginKeydown(event)"></label>`,
   `<p id="login-error" class="text-sm text-rose-600 mb-3 min-h-[1.25rem]"></p>`,
   `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700">เข้าสู่ระบบ</button>`,
-  `<p class="text-xs text-slate-400 text-center mt-4">ผู้ดูแลครั้งแรก: admin / 1234</p>`,
   `</${d}></${d}>`,
   `<${d} id="app-root" class="app-shell hidden h-screen flex overflow-hidden">`,
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
