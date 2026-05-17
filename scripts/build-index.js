@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '26';
+const ASSET_V = '27';
 const base = '/Renew-aleart';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
@@ -141,7 +141,13 @@ const html = [
   `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
   '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
   `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-lg gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Renew Aleart</${d}>`,
-  `<${d} class="p-4 space-y-2"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button><button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button><button type="button" id="admin-users-btn" onclick="openUserAdminModal()" class="hidden w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้</button></${d}>`,
+  `<${d} class="p-4 space-y-2 sidebar-nav">` +
+  `<button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button>` +
+  `<button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button>` +
+  `<button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button>` +
+  `<button type="button" onclick="openTestEmailModalFromNav()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-envelope"></i> ทดสอบอีเมล</button>` +
+  `<button type="button" id="admin-users-btn" onclick="openUserAdminModal()" class="hidden w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้</button>` +
+  `</${d}>`,
   `<${d} class="px-4 pb-3"><input type="text" id="project-search" placeholder="ค้นหาโครงการ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
   '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; Pongvit Y. 2026 License</p>',

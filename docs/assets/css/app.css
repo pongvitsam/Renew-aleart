@@ -43,18 +43,22 @@ body.login-mode {
 
 /* โครงหลักโหลดจาก app.css ทันที — ไม่รอ Tailwind CDN (ลดกระพริบ/crash ช่วงเปิดครั้งแรก) */
 html { height: 100%; }
-body.app-shell {
+body.app-shell,
+#app-root.app-shell {
   display: flex;
+  flex-direction: row;
   height: 100vh;
   height: 100dvh;
   overflow: hidden;
   margin: 0;
+  width: 100%;
 }
 #sidebar {
   width: 18rem;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 main.app-main {
   flex: 1;
@@ -78,6 +82,7 @@ main.app-main {
 .h-16 { height: 4rem; }
 .h-screen { height: 100vh; }
 .pt-16 { padding-top: 4rem; }
+.-translate-x-full { transform: translateX(-100%); }
 @media (min-width: 768px) {
   .md\:static { position: static; }
   .md\:translate-x-0 { transform: translateX(0); }
@@ -85,8 +90,11 @@ main.app-main {
   .md\:flex { display: flex; }
   .md\:pt-0 { padding-top: 0; }
   .md\:p-8 { padding: 1.5rem 2rem; }
+  #sidebar {
+    transform: translateX(0) !important;
+    position: static !important;
+  }
 }
-.-translate-x-full { transform: translateX(-100%); }
 html:not(.app-ready) #main-content { min-height: 12rem; }
 
 .skeleton-grid {
@@ -727,4 +735,11 @@ body.login-mode #app-root {
 }
 #app-root:not(.hidden) {
   display: flex;
+  flex-direction: row;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }

@@ -182,10 +182,16 @@ async function saveTimelineUpdate() {
   }
 }
 
+function openTestEmailModalFromNav() {
+  if (!App.projects.length) return showToast('ยังไม่มีโครงการ', 'error');
+  const id = App.currentProjectId || App.projects[0].id;
+  openTestEmailModal(id);
+}
+
 function openTestEmailModal(projectId) {
-  const project = App.projects.find(p => p.id === projectId);
-  if (!project) return;
-  App.activeTestProjectId = projectId;
+  const project = App.projects.find(p => Number(p.id) === Number(projectId));
+  if (!project) return showToast('ไม่พบโครงการ', 'error');
+  App.activeTestProjectId = project.id;
   const select = document.getElementById('test-email-license-select');
   select.replaceChildren();
   if (!(project.licenses || []).length) {
@@ -237,5 +243,5 @@ async function sendTestEmail() {
 
 Object.assign(window, {
   handleEmailInput, openProjectModal, saveProject, deleteProject, openLicenseModal, saveLicense,
-  saveTimelineUpdate, openTestEmailModal, updateMockEmailPreview, sendTestEmail
+  saveTimelineUpdate, openTestEmailModal, openTestEmailModalFromNav, updateMockEmailPreview, sendTestEmail
 });
