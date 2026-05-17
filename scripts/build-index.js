@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '20';
+const ASSET_V = '21';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -35,9 +35,11 @@ const projectModal = modal('projectModal', 'max-w-lg', `
 <input type="url" id="project-drive-url" placeholder="https://drive.google.com/drive/folders/..." class="w-full border rounded-xl px-4 py-3 mt-1 text-sm">
 <p class="text-xs text-slate-500 font-normal mt-1">ต้องวาง URL ก่อนจึงจะกดเปิดไฟล์ได้ — ไม่มีลิงก์จะเปิดไม่ได้</p></label>
 </${d}>
-<${d} class="p-5 border-t flex gap-3">
-<button type="button" onclick="closeModal('projectModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
-<button type="button" onclick="saveProject()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">บันทึก</button>
+<${d} class="p-5 border-t flex flex-wrap gap-3 items-center">
+<button type="button" id="project-delete-btn" onclick="deleteProject()" class="hidden btn-danger py-3 px-4 rounded-xl font-bold text-sm"><i class="fa-solid fa-trash-can mr-1"></i>ลบโครงการ</button>
+<${d} class="flex-1"></${d}>
+<button type="button" onclick="closeModal('projectModal')" class="border py-3 px-5 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="saveProject()" class="bg-blue-600 text-white py-3 px-6 rounded-xl font-bold">บันทึก</button>
 </${d}>`);
 
 const licenseModal = modal('licenseModal', 'max-w-xl', `

@@ -13,6 +13,14 @@ const Mutations = {
     return p?.licenses?.find(l => Number(l.id) === Number(licenseId));
   },
 
+  deleteProjectLocal(projectId) {
+    const id = Number(projectId);
+    App.projects = App.projects.filter(p => Number(p.id) !== id);
+    if (Number(App.currentProjectId) === id) App.currentProjectId = null;
+    this.persist();
+    return true;
+  },
+
   upsertProjectLocal(data, serverId) {
     const id = Number(serverId || data.id || Date.now());
     const existing = this.findProject(id);

@@ -46,8 +46,10 @@ function openProjectModal(projectId = null) {
   const title = document.getElementById('projectModalTitle');
   let dept = '';
 
+  const deleteBtn = document.getElementById('project-delete-btn');
+
   if (projectId) {
-    const project = App.projects.find(p => p.id === projectId);
+    const project = App.projects.find(p => Number(p.id) === Number(projectId));
     if (project) {
       title.textContent = 'แก้ไขโครงการ';
       document.getElementById('project-id').value = project.id;
@@ -55,13 +57,48 @@ function openProjectModal(projectId = null) {
       dept = project.department || '';
       if (driveEl) driveEl.value = project.driveUrl || '';
       App.tempEmails = [...(project.emails || [])];
+      if (deleteBtn) deleteBtn.classList.remove('hidden');
     }
   } else {
     title.textContent = 'เพิ่มโครงการใหม่';
+    if (deleteBtn) deleteBtn.classList.add('hidden');
   }
   populateDepartmentSelect(dept);
   renderEmailTags();
   openModal('projectModal');
+}
+
+async function deleteProject() {
+  const id = document.getElementById('project-id').value;
+  if (!id) return;
+
+  const project = App.projects.find(p => Number(p.id) === Number(id));
+  if (!project) return showToast('ไม่พบโครงการ', 'error');
+
+  const licCount = (project.licenses || []).length;
+  let msg = 'ลบโครงการ "' + project.name + '" ถาวร?';
+  if (licCount) {
+    msg += '\n\nจะลบใบอนุญาต ' + licCount + ' รายการ และประวัติขั้นตอนทั้งหมดด้วย';
+  }
+  if (!confirm(msg)) return;
+
+  Mutations.deleteProjectLocal(id);
+  closeModal('projectModal');
+  showToast('ลบโครงการแล้ว');
+
+  if (Number(App.currentProjectId) === Number(id)) {
+    App.currentProjectId = null;
+    showDashboard();
+  } else {
+    refreshCurrentView();
+  }
+
+  try {
+    await Api.deleteProject({ id: Number(id) });
+  } catch (err) {
+    showToast('ซิงค์การลบไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
+  }
 }
 
 async function saveProject() {
@@ -199,6 +236,6 @@ async function sendTestEmail() {
 }
 
 Object.assign(window, {
-  handleEmailInput, openProjectModal, saveProject, openLicenseModal, saveLicense,
+  handleEmailInput, openProjectModal, saveProject, deleteProject, openLicenseModal, saveLicense,
   saveTimelineUpdate, openTestEmailModal, updateMockEmailPreview, sendTestEmail
 });

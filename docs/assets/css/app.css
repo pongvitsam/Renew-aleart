@@ -499,6 +499,17 @@ body {
 }
 .btn-primary:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
+.btn-danger {
+  background: #fff1f2;
+  color: #be123c;
+  border: 1px solid #fecdd3;
+  transition: background 0.15s, border-color 0.15s;
+}
+.btn-danger:hover {
+  background: #ffe4e6;
+  border-color: #fda4af;
+}
+
 button:disabled,
 a.btn-primary[aria-disabled="true"] {
   pointer-events: none;

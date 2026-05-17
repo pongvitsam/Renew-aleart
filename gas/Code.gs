@@ -42,6 +42,10 @@ function routeAction_(action, data) {
       var saved = SheetService.saveProject(data);
       return { success: true, id: saved.id };
     }
+    case 'deleteProject': {
+      var removed = SheetService.deleteProject(data);
+      return { success: true, id: removed.id };
+    }
     case 'saveLicense': {
       var lic = SheetService.saveLicense(data);
       return { success: true, id: lic.id, projectId: data.projectId };

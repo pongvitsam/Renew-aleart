@@ -204,6 +204,12 @@ const Api = {
     return res;
   },
 
+  async deleteProject(data) {
+    const res = await this.call('deleteProject', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
   async saveLicense(data) {
     const res = await this.call('saveLicense', data, { skipCache: true });
     this.scheduleBackgroundRefresh();

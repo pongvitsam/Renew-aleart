@@ -13,9 +13,11 @@
 <input type="url" id="project-drive-url" placeholder="https://drive.google.com/drive/folders/..." class="w-full border rounded-xl px-4 py-3 mt-1 text-sm">
 <p class="text-xs text-slate-500 font-normal mt-1">ต้องวาง URL ก่อนจึงจะกดเปิดไฟล์ได้ — ไม่มีลิงก์จะเปิดไม่ได้</p></label>
 </div>
-<div class="p-5 border-t flex gap-3">
-<button type="button" onclick="closeModal('projectModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
-<button type="button" onclick="saveProject()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">บันทึก</button>
+<div class="p-5 border-t flex flex-wrap gap-3 items-center">
+<button type="button" id="project-delete-btn" onclick="deleteProject()" class="hidden btn-danger py-3 px-4 rounded-xl font-bold text-sm"><i class="fa-solid fa-trash-can mr-1"></i>ลบโครงการ</button>
+<div class="flex-1"></div>
+<button type="button" onclick="closeModal('projectModal')" class="border py-3 px-5 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="saveProject()" class="bg-blue-600 text-white py-3 px-6 rounded-xl font-bold">บันทึก</button>
 </div></div></div><div id="licenseModal" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 p-4"><div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] flex flex-col">
 <div class="bg-emerald-600 p-5 text-white font-bold flex justify-between"><span>เพิ่มใบอนุญาต</span><button type="button" onclick="closeModal('licenseModal')"><i class="fa-solid fa-xmark"></i></button></div>
 <div class="p-5 space-y-4 overflow-y-auto flex-1">
@@ -63,4 +65,4 @@
 <div class="flex gap-2"><input id="new-department-name" type="text" placeholder="ชื่อแผนกใหม่" class="flex-1 border rounded-xl px-3 py-2 text-sm"><button type="button" onclick="addDepartment()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold">เพิ่ม</button></div>
 <p class="text-xs text-slate-500">ลบได้เฉพาะแผนกที่ยังไม่มีโครงการ</p>
 <div id="department-list" class="space-y-2"></div>
-</div></div></div><script src="/Renew-aleart/assets/js/config.js?v=20"></script><script defer src="/Renew-aleart/assets/js/app.bundle.js?v=20"></script></body></html>
+</div></div></div><script src="/Renew-aleart/assets/js/config.js?v=21"></script><script defer src="/Renew-aleart/assets/js/app.bundle.js?v=21"></script></body></html>

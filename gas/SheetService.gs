@@ -311,6 +311,39 @@ var SheetService = (function () {
     return { success: true, id: newId };
   }
 
+  function deleteRowById_(sheetName, id) {
+    var ss = openSs_();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return false;
+    var rowIdx = findDataRow_(sheet, id);
+    if (rowIdx > 0) {
+      sheet.deleteRow(rowIdx);
+      return true;
+    }
+    return false;
+  }
+
+  function deleteProject(data) {
+    var id = Number(data.id);
+    if (!id) throw new Error('ไม่พบโครงการ');
+
+    var licRows = readTable_(CONFIG.SHEETS.LICENSES);
+    var licenseIds = [];
+    licRows.forEach(function (l) {
+      if (String(l.projectId) === String(id)) licenseIds.push(String(l.id));
+    });
+    licenseIds.forEach(function (lid) {
+      deleteHistoryForLicense_(lid);
+      deleteRowById_(CONFIG.SHEETS.LICENSES, lid);
+    });
+
+    if (!deleteRowById_(CONFIG.SHEETS.PROJECTS, id)) {
+      throw new Error('ไม่พบโครงการ');
+    }
+    invalidateCache_();
+    return { success: true, id: id };
+  }
+
   function reconcileStatusAfterStepsChange_(licenseId, steps, oldStatus) {
     if (!steps.length) return oldStatus || '';
     if (oldStatus && steps.indexOf(oldStatus) >= 0) return oldStatus;
@@ -539,6 +572,7 @@ var SheetService = (function () {
     getLicenseDetail: getLicenseDetail,
     getPayload: getPayload,
     saveProject: saveProject,
+    deleteProject: deleteProject,
     saveLicense: saveLicense,
     saveLicenseSteps: saveLicenseSteps,
     saveTimelineUpdate: saveTimelineUpdate,
