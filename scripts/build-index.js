@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '27';
+const ASSET_V = '28';
 const base = '/Renew-aleart';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
@@ -138,7 +138,12 @@ const html = [
   `</${d}></${d}>`,
   `<${d} id="app-root" class="app-shell hidden h-screen flex overflow-hidden">`,
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
-  `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
+  `<${d} class="app-mobile-bar md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4 gap-2">` +
+  `<span class="text-indigo-600 font-bold truncate"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span>` +
+  `<${d} class="flex items-center gap-2 shrink-0">` +
+  `<button type="button" onclick="logout()" class="text-xs font-bold text-rose-600 border border-rose-200 px-2 py-1 rounded-lg">ออก</button>` +
+  `<button type="button" onclick="toggleSidebar()" class="text-2xl leading-none" aria-label="เมนู"><i class="fa-solid fa-bars"></i></button>` +
+  `</${d}></${d}>`,
   '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
   `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-lg gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Renew Aleart</${d}>`,
   `<${d} class="p-4 space-y-2 sidebar-nav">` +
@@ -150,11 +155,14 @@ const html = [
   `</${d}>`,
   `<${d} class="px-4 pb-3"><input type="text" id="project-search" placeholder="ค้นหาโครงการ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
-  '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; Pongvit Y. 2026 License</p>',
+  `<${d} class="p-4 border-t border-slate-800 space-y-2">` +
+  `<p id="sidebar-user-label" class="text-xs text-slate-400 truncate px-1"></p>` +
+  `<button type="button" onclick="logout()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700 font-bold hover:bg-rose-950 hover:border-rose-800 hover:text-rose-300"><i class="fa-solid fa-right-from-bracket mr-1"></i> ออกจากระบบ</button>` +
+  `<p class="text-xs text-slate-500 text-center">&copy; Pongvit Y. 2026 License</p></${d}>`,
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
   '<main class="app-main flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
-  `<header class="hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><${d} class="flex items-center gap-3"><span id="user-badge" class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600 font-bold px-2 py-1 rounded-lg border border-slate-200">ออกจากระบบ</button></${d}></header>`,
+  `<header class="app-topbar hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><${d} class="flex items-center gap-3"><span id="user-badge" class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" id="logout-btn" onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600 font-bold px-3 py-1.5 rounded-lg border border-slate-200 bg-white">ออกจากระบบ</button></${d}></header>`,
   `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
   '</main>',
   `<${d} id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-3 pointer-events-none"></${d}>`,

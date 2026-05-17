@@ -72,12 +72,18 @@ const Auth = {
     const user = App.currentUser;
     const badge = document.getElementById('user-badge');
     const adminBtn = document.getElementById('admin-users-btn');
+    const sidebarUser = document.getElementById('sidebar-user-label');
+    const roleLabel = user?.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+    const name = user ? (user.displayName || user.username) : '—';
+
     if (badge && user) {
-      const roleLabel = user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
       badge.innerHTML =
         '<i class="fa-solid fa-user-circle"></i> ' +
-        Utils.escapeHtml(user.displayName || user.username) +
+        Utils.escapeHtml(name) +
         ' <span class="text-slate-400 font-normal">(' + roleLabel + ')</span>';
+    }
+    if (sidebarUser) {
+      sidebarUser.textContent = user ? name + ' · ' + roleLabel : '';
     }
     if (adminBtn) {
       adminBtn.classList.toggle('hidden', !user || user.role !== 'admin');

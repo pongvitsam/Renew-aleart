@@ -94,6 +94,15 @@ main.app-main {
     transform: translateX(0) !important;
     position: static !important;
   }
+  .app-topbar {
+    display: flex !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .app-mobile-bar {
+    display: flex !important;
+  }
 }
 html:not(.app-ready) #main-content { min-height: 12rem; }
 
