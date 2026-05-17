@@ -145,6 +145,9 @@ const Api = {
   applyPayload(res) {
     if (res.projects) App.projects = res.projects;
     if (res.departments) App.departments = res.departments;
+    if (res.projects) {
+      DataCache.set({ projects: App.projects, departments: App.departments });
+    }
     if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
     return res;
   },

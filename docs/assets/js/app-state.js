@@ -51,27 +51,43 @@ function hideSyncIndicator() {
   if (el) el.style.display = 'none';
 }
 
+function hasUsableProjectData() {
+  return Array.isArray(App.projects) && App.projects.length > 0;
+}
+
 async function loadProjects() {
-  const fresh = DataCache.get();
-  const stalePack = !fresh && DataCache.getStale();
-  const cached = fresh || stalePack?.data;
+  if (App._loadInFlight) return;
+  App._loadInFlight = true;
 
-  if (cached) {
-    applyServerData({ success: true, ...cached });
-    refreshCurrentView();
-    hideSetupBanner();
-    if (stalePack?.stale) showSyncIndicator();
-    App._syncing = true;
-    Api.syncFromApiInBackground()
-      .then(onProjectsLoaded)
-      .catch(onProjectsLoadError)
-      .finally(() => { App._syncing = false; });
-    return;
-  }
-
-  showDashboardSkeleton();
-  App._syncing = true;
   try {
+    const fresh = DataCache.get();
+    const stalePack = !fresh && DataCache.getStale();
+    const cached = fresh || stalePack?.data;
+
+    if (window.__BOOT_CACHE__) {
+      const boot = window.__BOOT_CACHE__;
+      delete window.__BOOT_CACHE__;
+      applyServerData({ success: true, ...boot });
+    }
+
+    if (cached) {
+      applyServerData({ success: true, ...cached });
+      refreshCurrentView();
+      hideSetupBanner();
+      if (stalePack?.stale) showSyncIndicator();
+      App._syncing = true;
+      Api.syncFromApiInBackground()
+        .then(onProjectsLoaded)
+        .catch(onProjectsLoadError)
+        .finally(() => { App._syncing = false; });
+      return;
+    }
+
+    if (!hasUsableProjectData()) {
+      showDashboardSkeleton();
+    }
+
+    App._syncing = true;
     const res = await Api.loadInitialPayload();
     onProjectsLoaded(res);
     if (!res._fromApi) {
@@ -85,7 +101,12 @@ async function loadProjects() {
     }
   } catch (err) {
     App._syncing = false;
+    if (!hasUsableProjectData() && !DataCache.getStale()) {
+      showDashboardSkeleton();
+    }
     onProjectsLoadError(err);
+  } finally {
+    App._loadInFlight = false;
   }
 }
 

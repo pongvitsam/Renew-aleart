@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '19';
+const ASSET_V = '20';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -111,7 +111,7 @@ const html = [
   '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet" media="print" onload="this.media=\'all\'">',
   '<script defer src="https://cdn.tailwindcss.com"></script>',
   '<script defer>document.addEventListener("DOMContentLoaded",function(){if(window.tailwind)tailwind.config={theme:{extend:{fontFamily:{sans:["Sarabun","sans-serif"]}}}};});</script>',
-  '</head><body class="text-slate-800 h-screen flex overflow-hidden">',
+  '</head><body class="app-shell text-slate-800 h-screen flex overflow-hidden">',
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
   `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
   '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
@@ -122,7 +122,7 @@ const html = [
   '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; Pongvit Y. 2026 License</p>',
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
-  '<main class="flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
+  '<main class="app-main flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
   '<header class="hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><span class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> ผู้ดูแลระบบ</span></header>',
   `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
   '</main>',

@@ -597,6 +597,9 @@ const Api = {
   applyPayload(res) {
     if (res.projects) App.projects = res.projects;
     if (res.departments) App.departments = res.departments;
+    if (res.projects) {
+      DataCache.set({ projects: App.projects, departments: App.departments });
+    }
     if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
     return res;
   },
@@ -769,27 +772,43 @@ function hideSyncIndicator() {
   if (el) el.style.display = 'none';
 }
 
+function hasUsableProjectData() {
+  return Array.isArray(App.projects) && App.projects.length > 0;
+}
+
 async function loadProjects() {
-  const fresh = DataCache.get();
-  const stalePack = !fresh && DataCache.getStale();
-  const cached = fresh || stalePack?.data;
+  if (App._loadInFlight) return;
+  App._loadInFlight = true;
 
-  if (cached) {
-    applyServerData({ success: true, ...cached });
-    refreshCurrentView();
-    hideSetupBanner();
-    if (stalePack?.stale) showSyncIndicator();
-    App._syncing = true;
-    Api.syncFromApiInBackground()
-      .then(onProjectsLoaded)
-      .catch(onProjectsLoadError)
-      .finally(() => { App._syncing = false; });
-    return;
-  }
-
-  showDashboardSkeleton();
-  App._syncing = true;
   try {
+    const fresh = DataCache.get();
+    const stalePack = !fresh && DataCache.getStale();
+    const cached = fresh || stalePack?.data;
+
+    if (window.__BOOT_CACHE__) {
+      const boot = window.__BOOT_CACHE__;
+      delete window.__BOOT_CACHE__;
+      applyServerData({ success: true, ...boot });
+    }
+
+    if (cached) {
+      applyServerData({ success: true, ...cached });
+      refreshCurrentView();
+      hideSetupBanner();
+      if (stalePack?.stale) showSyncIndicator();
+      App._syncing = true;
+      Api.syncFromApiInBackground()
+        .then(onProjectsLoaded)
+        .catch(onProjectsLoadError)
+        .finally(() => { App._syncing = false; });
+      return;
+    }
+
+    if (!hasUsableProjectData()) {
+      showDashboardSkeleton();
+    }
+
+    App._syncing = true;
     const res = await Api.loadInitialPayload();
     onProjectsLoaded(res);
     if (!res._fromApi) {
@@ -803,7 +822,12 @@ async function loadProjects() {
     }
   } catch (err) {
     App._syncing = false;
+    if (!hasUsableProjectData() && !DataCache.getStale()) {
+      showDashboardSkeleton();
+    }
     onProjectsLoadError(err);
+  } finally {
+    App._loadInFlight = false;
   }
 }
 
@@ -2334,17 +2358,30 @@ Object.assign(window, {
 
 /* app-main.js */
 function bootstrapApp() {
-  document.title = CONFIG.APP_TITLE || CONFIG.APP_NAME || 'Renew Aleart';
-  const boot = window.__BOOT_CACHE__;
-  const stale = DataCache.getStale();
-  const cached = boot || DataCache.get() || stale?.data;
-  if (cached) {
-    Api.applyPayload({ success: true, ...cached });
-    showDashboard();
-    if (boot) delete window.__BOOT_CACHE__;
+  try {
+    document.title = CONFIG.APP_TITLE || CONFIG.APP_NAME || 'Renew Aleart';
+    document.documentElement.classList.add('app-ready');
+    loadProjects().catch(err => {
+      console.error('loadProjects failed', err);
+      onProjectsLoadError(err);
+    });
+  } catch (err) {
+    console.error('bootstrap failed', err);
+    const main = document.getElementById('main-content');
+    if (main) {
+      main.innerHTML = '<p class="setup-banner" style="margin:1rem">โหลดแอปไม่สำเร็จ — ลองรีเฟรช (Ctrl+F5)</p>';
+    }
   }
-  loadProjects();
 }
+
+window.addEventListener('error', event => {
+  if (event.message && /ResizeObserver|tailwind/.test(event.message)) return;
+  console.error('App error:', event.error || event.message);
+});
+
+window.addEventListener('unhandledrejection', event => {
+  console.error('Unhandled rejection:', event.reason);
+});
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootstrapApp);

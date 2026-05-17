@@ -14,6 +14,54 @@
 
 * { box-sizing: border-box; }
 
+/* โครงหลักโหลดจาก app.css ทันที — ไม่รอ Tailwind CDN (ลดกระพริบ/crash ช่วงเปิดครั้งแรก) */
+html { height: 100%; }
+body.app-shell {
+  display: flex;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  margin: 0;
+}
+#sidebar {
+  width: 18rem;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+main.app-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+#main-content { flex: 1; min-height: 0; overflow: auto; }
+.hidden { display: none !important; }
+.flex { display: flex; }
+.flex-1 { flex: 1; min-width: 0; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.overflow-hidden { overflow: hidden; }
+.fixed { position: fixed; }
+.inset-0 { inset: 0; }
+.z-40 { z-index: 40; }
+.z-50 { z-index: 50; }
+.w-72 { width: 18rem; }
+.h-16 { height: 4rem; }
+.h-screen { height: 100vh; }
+.pt-16 { padding-top: 4rem; }
+@media (min-width: 768px) {
+  .md\:static { position: static; }
+  .md\:translate-x-0 { transform: translateX(0); }
+  .md\:hidden { display: none !important; }
+  .md\:flex { display: flex; }
+  .md\:pt-0 { padding-top: 0; }
+  .md\:p-8 { padding: 1.5rem 2rem; }
+}
+.-translate-x-full { transform: translateX(-100%); }
+html:not(.app-ready) #main-content { min-height: 12rem; }
+
 .skeleton-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
