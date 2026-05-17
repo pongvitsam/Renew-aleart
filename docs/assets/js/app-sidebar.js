@@ -41,7 +41,7 @@ function renderSidebar(light) {
     const section = document.createElement('section');
     section.className = 'mb-4';
     const heading = document.createElement('p');
-    heading.className = 'text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2 px-3 flex items-center gap-1.5';
+    heading.className = 'sidebar-dept-heading';
     heading.innerHTML = '<i class="fa-solid ' + deptIcon + '"></i> ' + Utils.escapeHtml(dept);
     section.appendChild(heading);
 
@@ -55,8 +55,8 @@ function renderSidebar(light) {
       const btn = document.createElement('button');
       btn.type = 'button';
       const active = App.currentProjectId === project.id;
-      btn.className = 'w-full text-left px-3 py-2 rounded-lg text-sm transition-all flex items-center gap-2 group ' +
-        (active ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 font-bold' : 'text-slate-300 hover:bg-slate-800 hover:text-white border border-transparent');
+      btn.className = 'sidebar-project w-full text-left px-3 py-2 text-sm transition-all flex items-center gap-2 group' +
+        (active ? ' sidebar-project--active font-bold' : '');
       btn.onclick = () => renderProjectView(project.id);
 
       const dot = document.createElement('span');
@@ -68,7 +68,7 @@ function renderSidebar(light) {
       label.innerHTML = Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo);
 
       const badge = document.createElement('span');
-      badge.className = 'bg-slate-800 text-slate-400 text-[10px] px-1.5 py-0.5 rounded-md shrink-0';
+      badge.className = 'sidebar-project-badge shrink-0';
       badge.textContent = String(project.licenses?.length || 0);
 
       btn.append(dot, label, badge);

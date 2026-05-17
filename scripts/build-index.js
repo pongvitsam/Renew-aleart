@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '29';
+const ASSET_V = '30';
 const base = '/Renew-aleart';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
@@ -21,7 +21,7 @@ const modal = (id, maxW, inner) =>
   `<${d} class="app-modal-panel bg-white rounded-2xl shadow-2xl w-full ${maxW} max-h-[90vh] flex flex-col">${inner}</${d}></${d}>`;
 
 const projectModal = modal('projectModal', 'max-w-lg', `
-<${d} class="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 flex justify-between text-white font-bold"><span id="projectModalTitle">เพิ่มโครงการใหม่</span><button type="button" onclick="closeModal('projectModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--blue"><span id="projectModalTitle">เพิ่มโครงการใหม่</span><button type="button" onclick="closeModal('projectModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 space-y-4 overflow-y-auto flex-1">
 <input type="hidden" id="project-id">
 <label class="block text-sm font-bold">ชื่อโครงการ *<input id="project-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
@@ -43,7 +43,7 @@ const projectModal = modal('projectModal', 'max-w-lg', `
 </${d}>`);
 
 const licenseModal = modal('licenseModal', 'max-w-xl', `
-<${d} class="bg-emerald-600 p-5 text-white font-bold flex justify-between"><span>เพิ่มใบอนุญาต</span><button type="button" onclick="closeModal('licenseModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--emerald"><span>เพิ่มใบอนุญาต</span><button type="button" onclick="closeModal('licenseModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 space-y-4 overflow-y-auto flex-1">
 <label class="block text-sm font-bold">ชื่อ *<input id="license-name" class="w-full border rounded-xl px-4 py-3 mt-1"></label>
 <${d} class="grid grid-cols-2 gap-4">
@@ -59,7 +59,7 @@ const licenseModal = modal('licenseModal', 'max-w-xl', `
 </${d}>`);
 
 const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
-<${d} class="bg-gradient-to-r from-purple-600 to-indigo-600 p-4 text-white font-bold flex justify-between items-center"><span><i class="fa-solid fa-list-check mr-2"></i><span id="timelineModalTitle">ขั้นตอนใบอนุญาต</span></span><button type="button" onclick="closeModal('timelineModal')" class="w-8 h-8 rounded-lg bg-white/20"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--purple"><span><i class="fa-solid fa-list-check mr-2"></i><span id="timelineModalTitle">ขั้นตอนใบอนุญาต</span></span><button type="button" onclick="closeModal('timelineModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="flex flex-col md:flex-row flex-1 overflow-hidden min-h-0">
 <${d} class="md:w-1/2 p-5 overflow-y-auto border-r bg-slate-50 custom-scrollbar">
 <${d} class="steps-editor-box mb-4">
@@ -78,7 +78,7 @@ const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 </${d}></${d}>`);
 
 const userAdminModal = modal('userAdminModal', 'max-w-lg', `
-<${d} class="bg-indigo-700 p-5 text-white font-bold flex justify-between"><span><i class="fa-solid fa-users-gear mr-2"></i>จัดการผู้ใช้</span><button type="button" onclick="closeModal('userAdminModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--indigo"><span><i class="fa-solid fa-users-gear mr-2"></i>จัดการผู้ใช้</span><button type="button" onclick="closeModal('userAdminModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 space-y-4 flex-1 overflow-y-auto">
 <${d} class="border rounded-xl p-4 bg-slate-50 space-y-3">
 <p id="user-form-title" class="text-sm font-bold text-slate-700">เพิ่มผู้ใช้</p>
@@ -95,7 +95,7 @@ const userAdminModal = modal('userAdminModal', 'max-w-lg', `
 </${d}>`);
 
 const departmentModal = modal('departmentModal', 'max-w-md', `
-<${d} class="bg-slate-800 p-5 text-white font-bold flex justify-between"><span>จัดการแผนก</span><button type="button" onclick="closeModal('departmentModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--slate"><span>จัดการแผนก</span><button type="button" onclick="closeModal('departmentModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 space-y-3 flex-1 overflow-y-auto">
 <${d} class="flex gap-2"><input id="new-department-name" type="text" placeholder="ชื่อแผนกใหม่" class="flex-1 border rounded-xl px-3 py-2 text-sm"><button type="button" onclick="addDepartment()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold">เพิ่ม</button></${d}>
 <p class="text-xs text-slate-500">ลบได้เฉพาะแผนกที่ยังไม่มีโครงการ</p>
@@ -103,7 +103,7 @@ const departmentModal = modal('departmentModal', 'max-w-md', `
 </${d}>`);
 
 const testModal = modal('testEmailModal', 'max-w-2xl', `
-<${d} class="p-5 border-b font-bold flex justify-between"><span>ทดสอบอีเมล</span><button type="button" onclick="closeModal('testEmailModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="modal-header modal-header--neutral"><span>ทดสอบอีเมล</span><button type="button" onclick="closeModal('testEmailModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 flex-1 overflow-y-auto space-y-4">
 <label class="text-sm font-bold block">ใบอนุญาต<select id="test-email-license-select" onchange="updateMockEmailPreview()" class="w-full border rounded-xl p-3 mt-1"></select></label>
 <${d} id="mock-email-preview" class="bg-slate-50 border p-4 rounded-xl text-sm"></${d}>
@@ -126,6 +126,7 @@ const html = [
   '<link rel="dns-prefetch" href="https://script.googleusercontent.com">',
   '<link rel="stylesheet" href="' + base + '/assets/css/tailwind.css?v=' + ASSET_V + '">',
   '<link rel="stylesheet" href="' + base + '/assets/css/app.css?v=' + ASSET_V + '">',
+  '<link rel="stylesheet" href="' + base + '/assets/css/modern.css?v=' + ASSET_V + '">',
   '<link rel="stylesheet" href="' + base + '/assets/vendor/fontawesome/css/all.min.css?v=' + ASSET_V + '">',
   '</head><body class="text-slate-800 h-screen overflow-hidden login-mode">',
   `<${d} id="login-screen" class="fixed inset-0 z-[80] flex items-center justify-center p-4 login-screen-bg">`,
@@ -165,9 +166,9 @@ const html = [
   `<p class="text-xs text-slate-500 text-center">&copy; Pongvit Y. 2026 License</p></${d}>`,
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
-  '<main class="app-main flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
+  '<main class="app-main flex-1 flex flex-col min-w-0 pt-16 md:pt-0">',
   `<header class="app-topbar hidden md:flex h-16 items-center justify-between px-6 md:px-8 glass-panel"><h2 id="page-title" class="page-heading">ภาพรวมระบบ</h2><${d} class="topbar-actions"><span id="user-badge" class="user-chip"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" id="logout-btn" onclick="logout()" class="btn-ghost-logout">ออกจากระบบ</button></${d}></header>`,
-  `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
+  `<${d} id="main-content" class="app-content flex-1 overflow-y-auto custom-scrollbar"></${d}>`,
   '</main>',
   `<${d} id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-3 pointer-events-none"></${d}>`,
   projectModal,

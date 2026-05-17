@@ -263,16 +263,15 @@ function buildProjectListRow(project, rank) {
 
 function makeStatCard(num, label, icon, tone) {
   const el = document.createElement('div');
-  el.className = 'stat-card';
-  const colors = { indigo: 'text-indigo-600', amber: 'text-amber-600', rose: 'text-rose-600', slate: 'text-slate-800' };
+  el.className = 'stat-card stat-card--' + (tone || 'slate');
   const top = document.createElement('div');
-  top.className = 'flex items-center justify-between mb-2';
-  top.innerHTML = '<i class="fa-solid ' + icon + ' text-2xl opacity-40"></i>';
+  top.className = 'stat-card__top';
+  top.innerHTML = '<span class="stat-card__icon"><i class="fa-solid ' + icon + '"></i></span>';
   const numEl = document.createElement('p');
-  numEl.className = 'text-3xl font-black ' + (colors[tone] || '');
+  numEl.className = 'stat-card__value';
   numEl.textContent = String(num);
   const lbl = document.createElement('p');
-  lbl.className = 'text-xs font-bold text-slate-500 uppercase mt-1';
+  lbl.className = 'stat-card__label';
   lbl.textContent = label;
   el.append(top, numEl, lbl);
   return el;
