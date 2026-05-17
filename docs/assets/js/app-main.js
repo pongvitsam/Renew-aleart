@@ -2,6 +2,8 @@ function bootstrapApp() {
   try {
     document.title = CONFIG.APP_TITLE || CONFIG.APP_NAME || 'Renew Aleart';
     document.documentElement.classList.add('app-ready');
+    if (!Auth.init()) return;
+    Auth._started = true;
     loadProjects().catch(err => {
       console.error('loadProjects failed', err);
       onProjectsLoadError(err);

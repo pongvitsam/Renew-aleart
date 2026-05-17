@@ -673,3 +673,26 @@ a.btn-primary[aria-disabled="true"] {
 html.has-cache body {
   visibility: visible;
 }
+
+/* หน้า Login */
+.login-screen-bg {
+  background: linear-gradient(145deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+}
+.login-card {
+  background: #fff;
+  border-radius: 1.25rem;
+  padding: 2rem;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.45);
+}
+body.login-mode #app-root {
+  display: none !important;
+}
+#login-screen {
+  display: flex;
+}
+#login-screen.hidden {
+  display: none !important;
+}
+#app-root:not(.hidden) {
+  display: flex;
+}

@@ -8,7 +8,7 @@ const bootInline =
   '<script>(function(){var K="renew_payload_v3",SNAP="/Renew-aleart/data/payload.json";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");return;}}}catch(e){}' +
   'window.__SNAPSHOT_PREFETCH__=fetch(SNAP,{cache:"no-store"}).then(function(r){return r.ok?r.json():null;});})();</script>';
-const ASSET_V = '21';
+const ASSET_V = '22';
 try {
   execSync('node "' + path.join(__dirname, 'bundle-js.js') + '"', { stdio: 'inherit' });
 } catch (e) {
@@ -77,6 +77,24 @@ const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 <${d} class="p-4 flex-1 overflow-y-auto bg-slate-50 custom-scrollbar"><p class="text-sm font-bold text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-1"></i>ประวัติ <span id="log-count" class="text-indigo-600">0</span></p><${d} id="history-log-container"></${d}></${d}>
 </${d}></${d}>`);
 
+const userAdminModal = modal('userAdminModal', 'max-w-lg', `
+<${d} class="bg-indigo-700 p-5 text-white font-bold flex justify-between"><span><i class="fa-solid fa-users-gear mr-2"></i>จัดการผู้ใช้</span><button type="button" onclick="closeModal('userAdminModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
+<${d} class="p-5 space-y-4 flex-1 overflow-y-auto">
+<${d} class="border rounded-xl p-4 bg-slate-50 space-y-3">
+<p id="user-form-title" class="text-sm font-bold text-slate-700">เพิ่มผู้ใช้</p>
+<input type="hidden" id="user-form-id">
+<label class="block text-xs font-bold">ชื่อผู้ใช้ (login) *<input id="user-form-username" class="w-full border rounded-xl px-3 py-2 text-sm mt-1" autocomplete="off"></label>
+<label class="block text-xs font-bold">ชื่อที่แสดง<input id="user-form-display" class="w-full border rounded-xl px-3 py-2 text-sm mt-1"></label>
+<label class="block text-xs font-bold">รหัสผ่าน<input type="password" id="user-form-password" class="w-full border rounded-xl px-3 py-2 text-sm mt-1" placeholder="รหัสผ่าน (บังคับเมื่อเพิ่มใหม่)"></label>
+<${d} class="grid grid-cols-2 gap-3">
+<label class="text-xs font-bold">บทบาท<select id="user-form-role" class="w-full border rounded-xl px-3 py-2 text-sm mt-1 block"><option value="user">ผู้ใช้งาน</option><option value="admin">ผู้ดูแลระบบ</option></select></label>
+<label class="text-xs font-bold flex items-end gap-2 pb-2"><input type="checkbox" id="user-form-active" checked class="rounded"> เปิดใช้งาน</label></${d}>
+<${d} class="flex gap-2"><button type="button" onclick="resetUserForm()" class="flex-1 border py-2 rounded-xl text-sm font-bold">ล้างฟอร์ม</button><button type="button" onclick="saveAppUser()" class="flex-[2] bg-indigo-600 text-white py-2 rounded-xl text-sm font-bold">บันทึกผู้ใช้</button></${d}>
+</${d}>
+<p class="text-xs text-slate-500">ผู้ดูแลเริ่มต้น: admin / 1234 (สร้างอัตโนมัติครั้งแรก)</p>
+<${d} id="user-admin-list" class="space-y-2"></${d}>
+</${d}>`);
+
 const departmentModal = modal('departmentModal', 'max-w-md', `
 <${d} class="bg-slate-800 p-5 text-white font-bold flex justify-between"><span>จัดการแผนก</span><button type="button" onclick="closeModal('departmentModal')"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 space-y-3 flex-1 overflow-y-auto">
@@ -113,19 +131,29 @@ const html = [
   '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&amp;display=swap" rel="stylesheet" media="print" onload="this.media=\'all\'">',
   '<script defer src="https://cdn.tailwindcss.com"></script>',
   '<script defer>document.addEventListener("DOMContentLoaded",function(){if(window.tailwind)tailwind.config={theme:{extend:{fontFamily:{sans:["Sarabun","sans-serif"]}}}};});</script>',
-  '</head><body class="app-shell text-slate-800 h-screen flex overflow-hidden">',
+  '</head><body class="text-slate-800 h-screen overflow-hidden login-mode">',
+  `<${d} id="login-screen" class="fixed inset-0 z-[80] flex items-center justify-center p-4 login-screen-bg">`,
+  `<${d} class="login-card w-full max-w-md">`,
+  `<${d} class="text-center mb-6"><i class="fa-solid fa-shield-halved text-4xl text-indigo-500"></i><h1 class="text-2xl font-bold mt-2">Renew Aleart</h1><p class="text-sm text-slate-500">เข้าสู่ระบบเพื่อจัดการใบอนุญาต</p></${d}>`,
+  `<label class="block text-sm font-bold mb-1">ชื่อผู้ใช้<input id="login-username" type="text" autocomplete="username" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="Auth.onLoginKeydown(event)"></label>`,
+  `<label class="block text-sm font-bold mb-4">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="w-full border rounded-xl px-4 py-3 mt-1" onkeydown="Auth.onLoginKeydown(event)"></label>`,
+  `<p id="login-error" class="text-sm text-rose-600 mb-3 min-h-[1.25rem]"></p>`,
+  `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl hover:bg-indigo-700">เข้าสู่ระบบ</button>`,
+  `<p class="text-xs text-slate-400 text-center mt-4">ผู้ดูแลครั้งแรก: admin / 1234</p>`,
+  `</${d}></${d}>`,
+  `<${d} id="app-root" class="app-shell hidden h-screen flex overflow-hidden">`,
   `<${d} id="loading-overlay" class="hidden fixed inset-0 bg-slate-900/40 z-[70] items-center justify-center backdrop-blur-sm"><${d} class="loader-card"><i class="fa-solid fa-spinner fa-spin mr-2"></i>กำลังโหลด...</${d}></${d}>`,
   `<${d} class="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b z-40 flex items-center justify-between px-4"><span class="text-indigo-600 font-bold"><i class="fa-solid fa-shield-halved"></i> Renew Aleart</span><button type="button" onclick="toggleSidebar()" class="text-2xl"><i class="fa-solid fa-bars"></i></button></${d}>`,
   '<aside id="sidebar" class="fixed md:static inset-y-0 left-0 w-72 bg-slate-900 text-slate-300 -translate-x-full md:translate-x-0 transition-transform z-50 flex flex-col">',
   `<${d} class="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800 font-bold text-white text-lg gap-2"><i class="fa-solid fa-shield-halved text-indigo-400"></i> Renew Aleart</${d}>`,
-  `<${d} class="p-4 space-y-2"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button><button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button></${d}>`,
+  `<${d} class="p-4 space-y-2"><button type="button" onclick="showDashboard()" class="w-full bg-slate-800 text-white py-3 rounded-xl"><i class="fa-solid fa-chart-pie text-indigo-400"></i> ภาพรวม</button><button type="button" onclick="openProjectModal()" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-xl"><i class="fa-solid fa-plus"></i> สร้างโครงการใหม่</button><button type="button" onclick="openDepartmentModal()" class="w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-building"></i> จัดการแผนก</button><button type="button" id="admin-users-btn" onclick="openUserAdminModal()" class="hidden w-full bg-slate-800 text-slate-200 py-2.5 rounded-xl text-sm border border-slate-700"><i class="fa-solid fa-users-gear"></i> จัดการผู้ใช้</button></${d}>`,
   `<${d} class="px-4 pb-3"><input type="text" id="project-search" placeholder="ค้นหาโครงการ..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-sm text-slate-200"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
   '<p class="p-4 text-xs text-slate-500 text-center border-t border-slate-800">&copy; Pongvit Y. 2026 License</p>',
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
   '<main class="app-main flex-1 flex flex-col min-w-0 bg-slate-50 pt-16 md:pt-0">',
-  '<header class="hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><span class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> ผู้ดูแลระบบ</span></header>',
+  `<header class="hidden md:flex h-16 bg-white border-b items-center justify-between px-8 glass-panel"><h2 id="page-title" class="text-xl font-bold">ภาพรวมระบบ</h2><${d} class="flex items-center gap-3"><span id="user-badge" class="text-sm bg-slate-100 px-3 py-1 rounded-full border"><i class="fa-solid fa-user-circle"></i> —</span><button type="button" onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600 font-bold px-2 py-1 rounded-lg border border-slate-200">ออกจากระบบ</button></${d}></header>`,
   `<${d} id="main-content" class="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8"></${d}>`,
   '</main>',
   `<${d} id="toast-container" class="fixed bottom-4 right-4 z-[60] flex flex-col gap-3 pointer-events-none"></${d}>`,
@@ -134,6 +162,8 @@ const html = [
   timelineModal,
   testModal,
   departmentModal,
+  userAdminModal,
+  '</${d}>',
   '<script src="/Renew-aleart/assets/js/config.js?v=' + ASSET_V + '"></script>',
   '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=' + ASSET_V + '"></script>',
   '</body></html>'

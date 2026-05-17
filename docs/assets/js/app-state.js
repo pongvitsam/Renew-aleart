@@ -6,6 +6,7 @@ const App = {
   currentProjectId: null,
   activeTestProjectId: null,
   tempEmails: [],
+  currentUser: null,
   _syncing: false
 };
 

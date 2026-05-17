@@ -21,6 +21,9 @@ var SheetService = (function () {
     ensureSheet_(ss, CONFIG.SHEETS.HISTORY, [
       'id', 'licenseId', 'date', 'action', 'note', 'createdAt'
     ]);
+    ensureSheet_(ss, CONFIG.SHEETS.USERS, [
+      'id', 'username', 'passwordHash', 'displayName', 'role', 'active', 'createdAt', 'updatedAt'
+    ]);
   }
 
   function ensureSheet_(ss, name, headers) {
@@ -44,6 +47,11 @@ var SheetService = (function () {
     if (!ss.getSheetByName(CONFIG.SHEETS.DEPARTMENTS)) {
       ensureSheet_(ss, CONFIG.SHEETS.DEPARTMENTS, ['id', 'name']);
     }
+    if (!ss.getSheetByName(CONFIG.SHEETS.USERS)) {
+      ensureSheet_(ss, CONFIG.SHEETS.USERS, [
+        'id', 'username', 'passwordHash', 'displayName', 'role', 'active', 'createdAt', 'updatedAt'
+      ]);
+    }
     var lic = ss.getSheetByName(CONFIG.SHEETS.LICENSES);
     if (lic && lic.getLastRow() > 0) {
       var lh = lic.getRange(1, 1, 1, lic.getLastColumn()).getValues()[0];
@@ -53,7 +61,7 @@ var SheetService = (function () {
     }
   }
 
-  var SCHEMA_READY_KEY_ = 'SCHEMA_READY_V3';
+  var SCHEMA_READY_KEY_ = 'SCHEMA_READY_V4';
   var ssInstance_ = null;
 
   function openSs_() {
@@ -62,8 +70,11 @@ var SheetService = (function () {
     var props = PropertiesService.getScriptProperties();
     if (props.getProperty(SCHEMA_READY_KEY_) !== '1') {
       initSheets_(ss);
-      migrateSheets_(ss);
       props.setProperty(SCHEMA_READY_KEY_, '1');
+    }
+    migrateSheets_(ss);
+    if (typeof AuthService !== 'undefined' && AuthService.ensureUsersSheet_) {
+      AuthService.ensureUsersSheet_();
     }
     ssInstance_ = ss;
     return ss;
@@ -580,6 +591,8 @@ var SheetService = (function () {
     addHistoryEntry: addHistoryEntry,
     readTable_: readTable_,
     appendRow_: appendRow_,
+    upsertRow_: upsertRow_,
+    ensureSheet_: ensureSheet_,
     ensureInitialized: ensureInitialized
   };
 })();

@@ -118,10 +118,19 @@ const Api = {
     return json;
   },
 
+  withSession(data) {
+    const token = typeof AuthStore !== 'undefined' ? AuthStore.getToken() : null;
+    if (!token) return data;
+    return { ...data, sessionToken: token };
+  },
+
   async call(action, data = {}, opts = {}) {
     if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
+
+    const publicActions = { login: true, ping: true };
+    const payload = publicActions[action] ? data : this.withSession(data);
 
     if (action === 'getProjects' && !opts.skipCache) {
       const cached = DataCache.get();
@@ -133,11 +142,19 @@ const Api = {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, data })
+      body: JSON.stringify({ action, data: payload })
     }, timeout);
 
     const text = await response.text();
-    const json = this.parseResponseText(text, action);
+    let json;
+    try {
+      json = this.parseResponseText(text, action);
+    } catch (err) {
+      if (/เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) && typeof Auth !== 'undefined') {
+        Auth.forceLogout(err.message);
+      }
+      throw err;
+    }
     if (action === 'getProjects') json._fromApi = true;
     return json;
   },
@@ -252,6 +269,30 @@ const Api = {
       this.scheduleBackgroundRefresh();
       return res;
     });
+  },
+
+  login(data) {
+    return this.call('login', data, { skipCache: true, timeoutMs: 30000 });
+  },
+
+  logout(data) {
+    return this.call('logout', data || {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  validateSession() {
+    return this.call('validateSession', {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  listUsers() {
+    return this.call('listUsers', {}, { skipCache: true });
+  },
+
+  saveUser(data) {
+    return this.call('saveUser', data, { skipCache: true });
+  },
+
+  deleteUser(data) {
+    return this.call('deleteUser', data, { skipCache: true });
   },
 
 };

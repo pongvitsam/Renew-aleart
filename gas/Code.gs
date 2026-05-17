@@ -24,10 +24,35 @@ function doPost(e) {
   }
 }
 
+var PUBLIC_ACTIONS_ = {
+  ping: true,
+  login: true,
+  setupSpreadsheet: true
+};
+
 function routeAction_(action, data) {
+  data = data || {};
+  var sessionUser = null;
+  if (!PUBLIC_ACTIONS_[action]) {
+    sessionUser = AuthService.requireAuth_(data.sessionToken);
+    data._sessionUser = sessionUser;
+  }
+
   switch (action) {
     case 'ping':
-      return { success: true, message: 'Renew Aleart API', version: '1.4.0' };
+      return { success: true, message: 'Renew Aleart API', version: '1.5.0' };
+    case 'login':
+      return AuthService.login(data);
+    case 'logout':
+      return AuthService.logout(data);
+    case 'validateSession':
+      return AuthService.validateSession(data);
+    case 'listUsers':
+      return AuthService.listUsers(data);
+    case 'saveUser':
+      return AuthService.saveUser(data);
+    case 'deleteUser':
+      return AuthService.deleteUser(data);
     case 'exportSnapshot':
       return SnapshotService.exportSnapshotNow();
     case 'getProjects': {

@@ -6,7 +6,13 @@ var CONFIG = {
     PROJECTS: 'Projects',
     LICENSES: 'Licenses',
     HISTORY: 'History',
-    DEPARTMENTS: 'Departments'
+    DEPARTMENTS: 'Departments',
+    USERS: 'Users'
+  },
+  DEFAULT_ADMIN: {
+    username: 'admin',
+    password: '1234',
+    displayName: 'ผู้ดูแลระบบ'
   },
   PROP_SPREADSHEET_ID: 'SPREADSHEET_ID',
   DEFAULT_DEPARTMENTS: [

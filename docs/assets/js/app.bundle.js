@@ -578,10 +578,19 @@ const Api = {
     return json;
   },
 
+  withSession(data) {
+    const token = typeof AuthStore !== 'undefined' ? AuthStore.getToken() : null;
+    if (!token) return data;
+    return { ...data, sessionToken: token };
+  },
+
   async call(action, data = {}, opts = {}) {
     if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
+
+    const publicActions = { login: true, ping: true };
+    const payload = publicActions[action] ? data : this.withSession(data);
 
     if (action === 'getProjects' && !opts.skipCache) {
       const cached = DataCache.get();
@@ -593,11 +602,19 @@ const Api = {
       method: 'POST',
       redirect: 'follow',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, data })
+      body: JSON.stringify({ action, data: payload })
     }, timeout);
 
     const text = await response.text();
-    const json = this.parseResponseText(text, action);
+    let json;
+    try {
+      json = this.parseResponseText(text, action);
+    } catch (err) {
+      if (/เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) && typeof Auth !== 'undefined') {
+        Auth.forceLogout(err.message);
+      }
+      throw err;
+    }
     if (action === 'getProjects') json._fromApi = true;
     return json;
   },
@@ -714,7 +731,176 @@ const Api = {
     });
   },
 
+  login(data) {
+    return this.call('login', data, { skipCache: true, timeoutMs: 30000 });
+  },
+
+  logout(data) {
+    return this.call('logout', data || {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  validateSession() {
+    return this.call('validateSession', {}, { skipCache: true, timeoutMs: 15000 });
+  },
+
+  listUsers() {
+    return this.call('listUsers', {}, { skipCache: true });
+  },
+
+  saveUser(data) {
+    return this.call('saveUser', data, { skipCache: true });
+  },
+
+  deleteUser(data) {
+    return this.call('deleteUser', data, { skipCache: true });
+  },
+
 };
+
+/* app-auth.js */
+const AuthStore = {
+  KEY: 'renew_session_v1',
+
+  get() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o.token || !o.user) return null;
+      if (o.expiresAt && Date.now() > new Date(o.expiresAt).getTime()) {
+        this.clear();
+        return null;
+      }
+      return o;
+    } catch {
+      return null;
+    }
+  },
+
+  set(session) {
+    localStorage.setItem(this.KEY, JSON.stringify(session));
+  },
+
+  clear() {
+    localStorage.removeItem(this.KEY);
+  },
+
+  getToken() {
+    const s = this.get();
+    return s ? s.token : null;
+  }
+};
+
+const Auth = {
+  _started: false,
+
+  init() {
+    const session = AuthStore.get();
+    if (session) {
+      App.currentUser = session.user;
+      this.showApp();
+      this.updateChrome();
+      return true;
+    }
+    this.showLogin();
+    return false;
+  },
+
+  showLogin() {
+    const screen = document.getElementById('login-screen');
+    const root = document.getElementById('app-root');
+    if (screen) screen.classList.remove('hidden');
+    if (root) root.classList.add('hidden');
+    document.body.classList.add('login-mode');
+  },
+
+  showApp() {
+    const screen = document.getElementById('login-screen');
+    const root = document.getElementById('app-root');
+    if (screen) screen.classList.add('hidden');
+    if (root) root.classList.remove('hidden');
+    document.body.classList.remove('login-mode');
+  },
+
+  updateChrome() {
+    const user = App.currentUser;
+    const badge = document.getElementById('user-badge');
+    const adminBtn = document.getElementById('admin-users-btn');
+    if (badge && user) {
+      const roleLabel = user.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+      badge.innerHTML =
+        '<i class="fa-solid fa-user-circle"></i> ' +
+        Utils.escapeHtml(user.displayName || user.username) +
+        ' <span class="text-slate-400 font-normal">(' + roleLabel + ')</span>';
+    }
+    if (adminBtn) {
+      adminBtn.classList.toggle('hidden', !user || user.role !== 'admin');
+    }
+  },
+
+  async submitLogin() {
+    const username = (document.getElementById('login-username')?.value || '').trim();
+    const password = document.getElementById('login-password')?.value || '';
+    const errEl = document.getElementById('login-error');
+    const btn = document.getElementById('login-submit-btn');
+
+    if (errEl) errEl.textContent = '';
+    if (!username || !password) {
+      if (errEl) errEl.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    try {
+      const res = await Api.login({ username, password });
+      AuthStore.set({ token: res.token, user: res.user, expiresAt: res.expiresAt });
+      App.currentUser = res.user;
+      this.showApp();
+      this.updateChrome();
+      if (!Auth._started) {
+        Auth._started = true;
+        loadProjects().catch(onProjectsLoadError);
+      }
+    } catch (err) {
+      if (errEl) errEl.textContent = err.message || 'เข้าสู่ระบบไม่สำเร็จ';
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  },
+
+  async logout() {
+    const token = AuthStore.getToken();
+    AuthStore.clear();
+    App.currentUser = null;
+    Auth._started = false;
+    try {
+      if (token) await Api.logout({ sessionToken: token });
+    } catch (_) {}
+    App.projects = [];
+    App.departments = [];
+    DataCache.clear();
+    this.showLogin();
+    const main = document.getElementById('main-content');
+    if (main) main.replaceChildren();
+  },
+
+  forceLogout(message) {
+    AuthStore.clear();
+    App.currentUser = null;
+    Auth._started = false;
+    this.showLogin();
+    const errEl = document.getElementById('login-error');
+    if (errEl && message) errEl.textContent = message;
+  },
+
+  onLoginKeydown(e) {
+    if (e.key === 'Enter') this.submitLogin();
+  }
+};
+
+Object.assign(window, {
+  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout()
+});
 
 /* app-index.js */
 function rebuildAppIndex() {
@@ -741,6 +927,7 @@ const App = {
   currentProjectId: null,
   activeTestProjectId: null,
   tempEmails: [],
+  currentUser: null,
   _syncing: false
 };
 
@@ -983,6 +1170,139 @@ async function deleteDepartment(id) {
 
 Object.assign(window, {
   openDepartmentModal, addDepartment, deleteDepartment, populateDepartmentSelect
+});
+
+/* app-users.js */
+function openUserAdminModal() {
+  if (!App.currentUser || App.currentUser.role !== 'admin') {
+    return showToast('เฉพาะผู้ดูแลระบบเท่านั้น', 'error');
+  }
+  resetUserForm();
+  renderUserList();
+  openModal('userAdminModal');
+}
+
+function resetUserForm() {
+  document.getElementById('user-form-id').value = '';
+  document.getElementById('user-form-username').value = '';
+  document.getElementById('user-form-display').value = '';
+  document.getElementById('user-form-password').value = '';
+  document.getElementById('user-form-password').placeholder = 'รหัสผ่าน (บังคับเมื่อเพิ่มใหม่)';
+  document.getElementById('user-form-role').value = 'user';
+  document.getElementById('user-form-active').checked = true;
+  document.getElementById('user-form-title').textContent = 'เพิ่มผู้ใช้';
+}
+
+function fillUserForm(user) {
+  document.getElementById('user-form-id').value = user.id;
+  document.getElementById('user-form-username').value = user.username;
+  document.getElementById('user-form-display').value = user.displayName || '';
+  document.getElementById('user-form-password').value = '';
+  document.getElementById('user-form-password').placeholder = 'เว้นว่าง = ไม่เปลี่ยนรหัสผ่าน';
+  document.getElementById('user-form-role').value = user.role === 'admin' ? 'admin' : 'user';
+  document.getElementById('user-form-active').checked = user.active !== false;
+  document.getElementById('user-form-title').textContent = 'แก้ไขผู้ใช้';
+}
+
+async function renderUserList() {
+  const list = document.getElementById('user-admin-list');
+  if (!list) return;
+  list.innerHTML = '<p class="text-sm text-slate-500 text-center py-4"><i class="fa-solid fa-spinner fa-spin"></i> กำลังโหลด...</p>';
+
+  try {
+    const res = await Api.listUsers();
+    const users = res.users || [];
+    list.replaceChildren();
+
+    if (!users.length) {
+      const p = document.createElement('p');
+      p.className = 'text-sm text-slate-500 text-center py-4';
+      p.textContent = 'ยังไม่มีผู้ใช้';
+      list.append(p);
+      return;
+    }
+
+    users.forEach(u => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center justify-between gap-2 bg-slate-50 border rounded-xl px-3 py-2';
+
+      const info = document.createElement('div');
+      info.className = 'min-w-0 flex-1';
+      const title = document.createElement('p');
+      title.className = 'font-bold text-sm truncate';
+      title.textContent = (u.displayName || u.username) + ' (@' + u.username + ')';
+      const sub = document.createElement('p');
+      sub.className = 'text-[11px] text-slate-500';
+      const roleTxt = u.role === 'admin' ? 'ผู้ดูแลระบบ' : 'ผู้ใช้งาน';
+      const activeTxt = u.active !== false ? 'ใช้งาน' : 'ปิดใช้งาน';
+      sub.textContent = roleTxt + ' · ' + activeTxt;
+      info.append(title, sub);
+
+      const actions = document.createElement('div');
+      actions.className = 'flex gap-1 shrink-0';
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'text-xs px-2 py-1 rounded border text-indigo-600 border-indigo-200 hover:bg-indigo-50';
+      editBtn.textContent = 'แก้ไข';
+      editBtn.onclick = () => fillUserForm(u);
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'text-xs px-2 py-1 rounded border text-rose-600 border-rose-200 hover:bg-rose-50';
+      delBtn.textContent = 'ลบ';
+      const isSelf = Number(App.currentUser?.id) === Number(u.id);
+      delBtn.disabled = isSelf;
+      delBtn.title = isSelf ? 'ไม่สามารถลบบัญชีตัวเอง' : 'ลบผู้ใช้';
+      delBtn.onclick = () => deleteAppUser(u.id);
+
+      actions.append(editBtn, delBtn);
+      row.append(info, actions);
+      list.append(row);
+    });
+  } catch (err) {
+    list.innerHTML = '<p class="text-sm text-rose-600 text-center py-4">' + Utils.escapeHtml(err.message) + '</p>';
+  }
+}
+
+async function saveAppUser() {
+  const id = document.getElementById('user-form-id').value;
+  const username = document.getElementById('user-form-username').value.trim();
+  const displayName = document.getElementById('user-form-display').value.trim();
+  const password = document.getElementById('user-form-password').value;
+  const role = document.getElementById('user-form-role').value;
+  const active = document.getElementById('user-form-active').checked;
+
+  if (!username) return showToast('กรุณาระบุชื่อผู้ใช้', 'error');
+  if (!id && !password) return showToast('กรุณาตั้งรหัสผ่าน', 'error');
+
+  const payload = { username, displayName, role, active };
+  if (id) payload.id = Number(id);
+  if (password) payload.password = password;
+
+  try {
+    await Api.saveUser(payload);
+    showToast(id ? 'บันทึกผู้ใช้แล้ว' : 'เพิ่มผู้ใช้แล้ว');
+    resetUserForm();
+    renderUserList();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function deleteAppUser(id) {
+  if (!confirm('ลบผู้ใช้นี้?')) return;
+  try {
+    await Api.deleteUser({ id: Number(id) });
+    showToast('ลบผู้ใช้แล้ว');
+    renderUserList();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+Object.assign(window, {
+  openUserAdminModal, saveAppUser, deleteAppUser, resetUserForm
 });
 
 /* app-sidebar.js */
@@ -2412,6 +2732,8 @@ function bootstrapApp() {
   try {
     document.title = CONFIG.APP_TITLE || CONFIG.APP_NAME || 'Renew Aleart';
     document.documentElement.classList.add('app-ready');
+    if (!Auth.init()) return;
+    Auth._started = true;
     loadProjects().catch(err => {
       console.error('loadProjects failed', err);
       onProjectsLoadError(err);
