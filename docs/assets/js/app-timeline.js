@@ -200,8 +200,10 @@ async function saveLicenseSteps() {
   const projectId = App.currentProjectId;
   const license = Mutations.findLicense(projectId, licenseId);
   if (!license) return showToast('ไม่พบใบอนุญาต', 'error');
+  const stepsEl = document.getElementById('timeline-steps-edit');
+  if (!stepsEl) return showToast('ปิดการแก้ไขขั้นตอนแล้ว', 'error');
 
-  const steps = Utils.parseStepsText(document.getElementById('timeline-steps-edit').value);
+  const steps = Utils.parseStepsText(stepsEl.value);
   if (!steps.length) return showToast('ต้องมีอย่างน้อย 1 ขั้นตอน', 'error');
 
   const status = Utils.resolveStatusAfterStepsChangeForLicense(license, steps, license.status);
