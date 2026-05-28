@@ -221,6 +221,8 @@ async function cancelTimelineStep(step) {
 
   const found = Mutations.cancelTimelineStepLocal(licenseId, step);
   if (!found) return showToast('ไม่พบข้อมูลขั้นตอน', 'error');
+  App._timelineStepsEditorLocked = App._timelineStepsEditorLocked || {};
+  App._timelineStepsEditorLocked[Number(licenseId)] = false;
   renderTimeline(App.currentProjectId, Number(licenseId));
   refreshCurrentView({ skipSidebar: true });
   showToast('ยกเลิกขั้นตอนแล้ว');

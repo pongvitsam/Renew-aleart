@@ -8,7 +8,8 @@ const App = {
   activeTestProjectId: null,
   tempEmails: [],
   currentUser: null,
-  _syncing: false
+  _syncing: false,
+  _timelineStepsEditorLocked: {}
 };
 
 function applyServerData(res) {

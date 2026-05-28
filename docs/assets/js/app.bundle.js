@@ -515,7 +515,8 @@ const App = {
   activeTestProjectId: null,
   tempEmails: [],
   currentUser: null,
-  _syncing: false
+  _syncing: false,
+  _timelineStepsEditorLocked: {}
 };
 
 function applyServerData(res) {
@@ -2052,9 +2053,15 @@ const TimelineUI = {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
-      row.disabled = !canSave;
+      row.disabled = !canSave && !canCancel;
       row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (canCancel ? 'ยกเลิกขั้นตอนล่าสุดได้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ'));
-      row.onclick = () => saveTimelineStepQuick(step);
+      const noteInputId = 'timeline-note-' + String(license.id) + '-' + String(idx);
+      row.onclick = () => {
+        if (!canSave) return;
+        const noteEl = document.getElementById(noteInputId);
+        const note = noteEl ? noteEl.value : '';
+        saveTimelineStepQuick(step, note);
+      };
 
       const dot = document.createElement('div');
       dot.className = 'timeline-dot';
@@ -2085,6 +2092,26 @@ const TimelineUI = {
         pin.className = 'text-[11px] text-indigo-600 font-bold mt-2';
         pin.textContent = 'กดเพื่อบันทึกขั้นตอนนี้';
         body.appendChild(pin);
+
+        const noteLabel = document.createElement('label');
+        noteLabel.className = 'block mt-2';
+        noteLabel.innerHTML =
+          '<span class="text-[11px] text-slate-500 font-bold">หมายเหตุ</span>' +
+          '<textarea id="' + noteInputId + '" rows="2" placeholder="พิมพ์หมายเหตุของขั้นตอนนี้ (ไม่บังคับ)" class="w-full mt-1 border rounded-lg p-2 text-xs bg-white"></textarea>';
+        body.appendChild(noteLabel);
+
+        const inlineSaveBtn = document.createElement('button');
+        inlineSaveBtn.type = 'button';
+        inlineSaveBtn.className = 'mt-2 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-lg';
+        inlineSaveBtn.textContent = 'บันทึกขั้นตอนนี้';
+        inlineSaveBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const noteEl = document.getElementById(noteInputId);
+          const note = noteEl ? noteEl.value : '';
+          saveTimelineStepQuick(step, note);
+        };
+        body.appendChild(inlineSaveBtn);
       }
 
       if (canCancel) {
@@ -2185,8 +2212,25 @@ async function renderTimeline(projectId, licenseId) {
 }
 
 function paintTimelineModal(license) {
+  const lockMap = App._timelineStepsEditorLocked || {};
+  const isEditorLocked = !!lockMap[license.id];
+  const editorBox = document.querySelector('#timelineModal .steps-editor-box');
+  if (editorBox) editorBox.classList.toggle('hidden', isEditorLocked);
+  const headerWrap = document.querySelector('#timelineModal .p-5.border-b.bg-white');
+  if (headerWrap) {
+    let hint = document.getElementById('timeline-steps-lock-hint');
+    if (!hint) {
+      hint = document.createElement('p');
+      hint.id = 'timeline-steps-lock-hint';
+      hint.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 hidden';
+      hint.textContent = 'ล็อกการแก้ไขขั้นตอนแล้ว — หากยกเลิกขั้นตอนล่าสุด ระบบจะเปิดให้แก้ไขขั้นตอนได้อีกครั้ง';
+      headerWrap.prepend(hint);
+    }
+    hint.classList.toggle('hidden', !isEditorLocked);
+  }
+
   const stepsEdit = document.getElementById('timeline-steps-edit');
-  if (stepsEdit) {
+  if (stepsEdit && !isEditorLocked) {
     const defaultSteps = [
       'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
       'ขอเอกสารสนับสนุนจากลูกค้า',
@@ -2213,10 +2257,12 @@ async function saveLicenseSteps() {
 
   const status = Utils.resolveStatusAfterStepsChangeForLicense(license, steps, license.status);
 
+  App._timelineStepsEditorLocked = App._timelineStepsEditorLocked || {};
+  App._timelineStepsEditorLocked[licenseId] = true;
   Mutations.updateLicenseStepsLocal(projectId, licenseId, steps, status);
   paintTimelineModal(Mutations.findLicense(projectId, licenseId));
   showToast('บันทึกรายการขั้นตอนแล้ว');
-  refreshCurrentView();
+  refreshCurrentView({ skipSidebar: true });
 
   try {
     await Api.saveLicenseSteps({ licenseId, steps });
@@ -2234,12 +2280,9 @@ async function saveLicenseSteps() {
 window.renderTimeline = renderTimeline;
 window.saveLicenseSteps = saveLicenseSteps;
 
-function saveTimelineStepQuick(step) {
+function saveTimelineStepQuick(step, note) {
   App._timelineQuickStep = step;
-  const promptValue = window.prompt('หมายเหตุสำหรับขั้นตอน "' + step + '" (ไม่บังคับ)', '');
-  if (promptValue === null) return;
-  const note = promptValue;
-  saveTimelineUpdate(step, note);
+  saveTimelineUpdate(step, note || '');
 }
 
 function cancelTimelineStepQuick(step) {
@@ -3129,6 +3172,8 @@ async function cancelTimelineStep(step) {
 
   const found = Mutations.cancelTimelineStepLocal(licenseId, step);
   if (!found) return showToast('ไม่พบข้อมูลขั้นตอน', 'error');
+  App._timelineStepsEditorLocked = App._timelineStepsEditorLocked || {};
+  App._timelineStepsEditorLocked[Number(licenseId)] = false;
   renderTimeline(App.currentProjectId, Number(licenseId));
   refreshCurrentView({ skipSidebar: true });
   showToast('ยกเลิกขั้นตอนแล้ว');
