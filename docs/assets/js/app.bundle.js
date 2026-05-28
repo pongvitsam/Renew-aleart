@@ -2009,6 +2009,7 @@ const TimelineUI = {
 
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
+    const nextPendingIdx = steps.findIndex(s => !roundHist.some(h => h.action === s));
 
     const flow = document.createElement('div');
     flow.className = 'timeline-flow';
@@ -2018,13 +2019,13 @@ const TimelineUI = {
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
-      const canSave = !done || current;
+      const canSave = (!done && idx === (nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx)) || current;
 
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
       row.disabled = !canSave;
-      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : 'บันทึกแล้ว';
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ');
       row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
@@ -2991,11 +2992,23 @@ async function saveTimelineUpdate() {
   const note = document.getElementById('update-note').value.trim();
   if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
 
+  const project = App.projects.find(p => Number(p.id) === Number(App.currentProjectId));
+  const license = project?.licenses?.find(l => Number(l.id) === Number(licenseId));
+  const lastStep = license?.steps?.length ? license.steps[license.steps.length - 1] : '';
+  const completedFinal = !!step && !!lastStep && step === lastStep;
+
   Mutations.timelineUpdateLocal(licenseId, step, note);
   document.getElementById('update-note').value = '';
   renderTimeline(App.currentProjectId, Number(licenseId));
   renderProjectView(App.currentProjectId);
   showToast('บันทึกขั้นตอนแล้ว');
+  if (completedFinal) {
+    showToast('ขั้นตอนครบแล้ว — กรุณากรอกวันเริ่ม/หมดอายุรอบถัดไป', 'success');
+    setTimeout(() => {
+      const panel = document.getElementById('renewal-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 180);
+  }
 
   try {
     await Api.saveTimelineUpdate({ licenseId, step, note });

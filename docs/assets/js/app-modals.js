@@ -185,11 +185,23 @@ async function saveTimelineUpdate() {
   const note = document.getElementById('update-note').value.trim();
   if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
 
+  const project = App.projects.find(p => Number(p.id) === Number(App.currentProjectId));
+  const license = project?.licenses?.find(l => Number(l.id) === Number(licenseId));
+  const lastStep = license?.steps?.length ? license.steps[license.steps.length - 1] : '';
+  const completedFinal = !!step && !!lastStep && step === lastStep;
+
   Mutations.timelineUpdateLocal(licenseId, step, note);
   document.getElementById('update-note').value = '';
   renderTimeline(App.currentProjectId, Number(licenseId));
   renderProjectView(App.currentProjectId);
   showToast('บันทึกขั้นตอนแล้ว');
+  if (completedFinal) {
+    showToast('ขั้นตอนครบแล้ว — กรุณากรอกวันเริ่ม/หมดอายุรอบถัดไป', 'success');
+    setTimeout(() => {
+      const panel = document.getElementById('renewal-panel');
+      if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 180);
+  }
 
   try {
     await Api.saveTimelineUpdate({ licenseId, step, note });

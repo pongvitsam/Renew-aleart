@@ -15,6 +15,7 @@ const TimelineUI = {
 
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
+    const nextPendingIdx = steps.findIndex(s => !roundHist.some(h => h.action === s));
 
     const flow = document.createElement('div');
     flow.className = 'timeline-flow';
@@ -24,13 +25,13 @@ const TimelineUI = {
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
-      const canSave = !done || current;
+      const canSave = (!done && idx === (nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx)) || current;
 
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
       row.disabled = !canSave;
-      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : 'บันทึกแล้ว';
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ');
       row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
