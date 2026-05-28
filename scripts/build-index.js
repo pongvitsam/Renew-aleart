@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '33';
+const ASSET_V = '34';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -42,6 +42,10 @@ const projectModal = modal('projectModal', 'max-w-lg', `
 </${d}>
 <${d} class="p-5 border-t flex flex-wrap gap-3 items-center">
 <button type="button" id="project-delete-btn" onclick="deleteProject()" class="hidden btn-danger py-3 px-4 rounded-xl font-bold text-sm"><i class="fa-solid fa-trash-can mr-1"></i>ลบโครงการ</button>
+<${d} id="project-delete-verify-wrap" class="hidden w-full rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 space-y-2">
+<p>ยืนยันการลบโดยกรอกรหัส <b id="project-delete-code-label">------</b></p>
+<input id="project-delete-code-input" class="w-full border border-rose-300 rounded-lg px-3 py-2 text-sm bg-white text-slate-800" placeholder="กรอกรหัสยืนยันก่อนกดลบ">
+</${d}>
 <${d} class="flex-1"></${d}>
 <button type="button" onclick="closeModal('projectModal')" class="border py-3 px-5 rounded-xl font-bold">ยกเลิก</button>
 <button type="button" onclick="saveProject()" class="bg-blue-600 text-white py-3 px-6 rounded-xl font-bold">บันทึก</button>
@@ -141,8 +145,8 @@ const html = [
   `<${d} class="login-brand"><span class="login-brand-icon"><i class="fa-solid fa-shield-halved"></i></span></${d}>`,
   `<h1 class="login-title">ยินดีต้อนรับ</h1>`,
   `<p class="login-subtitle">ติดตามวันหมดอายุใบอนุญาตและแจ้งเตือนทีมงานได้ในที่เดียว</p>`,
-  `<label class="field-label">ชื่อผู้ใช้<span class="field-hint">ใช้บัญชีที่ได้รับจากผู้ดูแล</span><input id="login-username" type="text" autocomplete="username" class="field-input" placeholder="เช่น admin" onkeydown="onLoginKeydown(event)"></label>`,
-  `<label class="field-label">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="field-input" placeholder="••••••••" onkeydown="onLoginKeydown(event)"></label>`,
+  `<label class="field-label">ชื่อผู้ใช้<span class="field-hint">ใช้บัญชีที่ได้รับจากผู้ดูแล</span><input id="login-username" type="text" autocomplete="username" class="field-input" placeholder="เช่น admin" oninput="onLoginInput(event)" onkeydown="onLoginKeydown(event)"></label>`,
+  `<label class="field-label">รหัสผ่าน<input id="login-password" type="password" autocomplete="current-password" class="field-input" placeholder="••••••••" oninput="onLoginInput(event)" onkeydown="onLoginKeydown(event)"></label>`,
   `<p id="login-error" class="login-error" role="alert"></p>`,
   `<button type="button" id="login-submit-btn" onclick="submitLogin()" class="btn-login w-full">เข้าสู่ระบบ</button>`,
   `</${d}></${d}>`,

@@ -33,6 +33,8 @@ const AuthStore = {
 
 const Auth = {
   _started: false,
+  _primeStarted: false,
+  _primePromise: null,
 
   init() {
     const session = AuthStore.get();
@@ -56,6 +58,19 @@ const Auth = {
     } else {
       setTimeout(run, 2500);
     }
+  },
+
+  primeLoginData() {
+    if (this._primePromise) return this._primePromise;
+    if (!CONFIG?.API_URL?.trim()) return Promise.resolve(null);
+    this._primeStarted = true;
+    this._primePromise = Promise.allSettled([
+      Api.ping(),
+      Api.loadInitialPayload()
+    ]).finally(() => {
+      this._primePromise = null;
+    });
+    return this._primePromise;
   },
 
   showLogin() {
@@ -112,7 +127,6 @@ const Auth = {
     const username = (document.getElementById('login-username')?.value || '').trim();
     const password = document.getElementById('login-password')?.value || '';
     const errEl = document.getElementById('login-error');
-    const btn = document.getElementById('login-submit-btn');
 
     if (errEl) errEl.textContent = '';
     if (!username || !password) {
@@ -184,6 +198,10 @@ const Auth = {
       e.preventDefault();
       this.submitLogin();
     }
+  },
+
+  onLoginInput() {
+    this.primeLoginData();
   }
 };
 
@@ -191,6 +209,10 @@ function onLoginKeydown(e) {
   Auth.onLoginKeydown(e);
 }
 
+function onLoginInput() {
+  Auth.onLoginInput();
+}
+
 Object.assign(window, {
-  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown
+  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown, onLoginInput
 });

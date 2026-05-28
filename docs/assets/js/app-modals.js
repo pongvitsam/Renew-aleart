@@ -47,6 +47,10 @@ function openProjectModal(projectId = null) {
   let dept = '';
 
   const deleteBtn = document.getElementById('project-delete-btn');
+  const deleteVerifyWrap = document.getElementById('project-delete-verify-wrap');
+  const deleteCodeLabel = document.getElementById('project-delete-code-label');
+  const deleteCodeInput = document.getElementById('project-delete-code-input');
+  App._deleteProjectCode = '';
 
   if (projectId) {
     const project = App.projects.find(p => Number(p.id) === Number(projectId));
@@ -58,10 +62,15 @@ function openProjectModal(projectId = null) {
       if (driveEl) driveEl.value = project.driveUrl || '';
       App.tempEmails = [...(project.emails || [])];
       if (deleteBtn) deleteBtn.classList.remove('hidden');
+      App._deleteProjectCode = String(Math.floor(100000 + Math.random() * 900000));
+      if (deleteVerifyWrap) deleteVerifyWrap.classList.remove('hidden');
+      if (deleteCodeLabel) deleteCodeLabel.textContent = App._deleteProjectCode;
+      if (deleteCodeInput) deleteCodeInput.value = '';
     }
   } else {
     title.textContent = 'เพิ่มโครงการใหม่';
     if (deleteBtn) deleteBtn.classList.add('hidden');
+    if (deleteVerifyWrap) deleteVerifyWrap.classList.add('hidden');
   }
   populateDepartmentSelect(dept);
   renderEmailTags();
@@ -76,6 +85,13 @@ async function deleteProject() {
   if (!project) return showToast('ไม่พบโครงการ', 'error');
 
   const licCount = (project.licenses || []).length;
+  const typedCode = (document.getElementById('project-delete-code-input')?.value || '').trim();
+  if (!typedCode || typedCode !== App._deleteProjectCode) {
+    showToast('รหัสยืนยันไม่ถูกต้อง', 'error');
+    const input = document.getElementById('project-delete-code-input');
+    if (input) input.focus();
+    return;
+  }
   let msg = 'ลบโครงการ "' + project.name + '" ถาวร?';
   if (licCount) {
     msg += '\n\nจะลบใบอนุญาต ' + licCount + ' รายการ และประวัติขั้นตอนทั้งหมดด้วย';

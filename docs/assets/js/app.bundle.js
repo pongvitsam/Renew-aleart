@@ -1047,6 +1047,8 @@ const AuthStore = {
 
 const Auth = {
   _started: false,
+  _primeStarted: false,
+  _primePromise: null,
 
   init() {
     const session = AuthStore.get();
@@ -1070,6 +1072,19 @@ const Auth = {
     } else {
       setTimeout(run, 2500);
     }
+  },
+
+  primeLoginData() {
+    if (this._primePromise) return this._primePromise;
+    if (!CONFIG?.API_URL?.trim()) return Promise.resolve(null);
+    this._primeStarted = true;
+    this._primePromise = Promise.allSettled([
+      Api.ping(),
+      Api.loadInitialPayload()
+    ]).finally(() => {
+      this._primePromise = null;
+    });
+    return this._primePromise;
   },
 
   showLogin() {
@@ -1126,7 +1141,6 @@ const Auth = {
     const username = (document.getElementById('login-username')?.value || '').trim();
     const password = document.getElementById('login-password')?.value || '';
     const errEl = document.getElementById('login-error');
-    const btn = document.getElementById('login-submit-btn');
 
     if (errEl) errEl.textContent = '';
     if (!username || !password) {
@@ -1198,6 +1212,10 @@ const Auth = {
       e.preventDefault();
       this.submitLogin();
     }
+  },
+
+  onLoginInput() {
+    this.primeLoginData();
   }
 };
 
@@ -1205,8 +1223,12 @@ function onLoginKeydown(e) {
   Auth.onLoginKeydown(e);
 }
 
+function onLoginInput() {
+  Auth.onLoginInput();
+}
+
 Object.assign(window, {
-  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown
+  Auth, AuthStore, submitLogin: () => Auth.submitLogin(), logout: () => Auth.logout(), onLoginKeydown, onLoginInput
 });
 
 /* app-index.js */
@@ -2783,6 +2805,10 @@ function openProjectModal(projectId = null) {
   let dept = '';
 
   const deleteBtn = document.getElementById('project-delete-btn');
+  const deleteVerifyWrap = document.getElementById('project-delete-verify-wrap');
+  const deleteCodeLabel = document.getElementById('project-delete-code-label');
+  const deleteCodeInput = document.getElementById('project-delete-code-input');
+  App._deleteProjectCode = '';
 
   if (projectId) {
     const project = App.projects.find(p => Number(p.id) === Number(projectId));
@@ -2794,10 +2820,15 @@ function openProjectModal(projectId = null) {
       if (driveEl) driveEl.value = project.driveUrl || '';
       App.tempEmails = [...(project.emails || [])];
       if (deleteBtn) deleteBtn.classList.remove('hidden');
+      App._deleteProjectCode = String(Math.floor(100000 + Math.random() * 900000));
+      if (deleteVerifyWrap) deleteVerifyWrap.classList.remove('hidden');
+      if (deleteCodeLabel) deleteCodeLabel.textContent = App._deleteProjectCode;
+      if (deleteCodeInput) deleteCodeInput.value = '';
     }
   } else {
     title.textContent = 'เพิ่มโครงการใหม่';
     if (deleteBtn) deleteBtn.classList.add('hidden');
+    if (deleteVerifyWrap) deleteVerifyWrap.classList.add('hidden');
   }
   populateDepartmentSelect(dept);
   renderEmailTags();
@@ -2812,6 +2843,13 @@ async function deleteProject() {
   if (!project) return showToast('ไม่พบโครงการ', 'error');
 
   const licCount = (project.licenses || []).length;
+  const typedCode = (document.getElementById('project-delete-code-input')?.value || '').trim();
+  if (!typedCode || typedCode !== App._deleteProjectCode) {
+    showToast('รหัสยืนยันไม่ถูกต้อง', 'error');
+    const input = document.getElementById('project-delete-code-input');
+    if (input) input.focus();
+    return;
+  }
   let msg = 'ลบโครงการ "' + project.name + '" ถาวร?';
   if (licCount) {
     msg += '\n\nจะลบใบอนุญาต ' + licCount + ' รายการ และประวัติขั้นตอนทั้งหมดด้วย';
