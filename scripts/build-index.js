@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '35';
+const ASSET_V = '36';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -129,6 +129,9 @@ const html = [
   bootInline,
   snapshotPrefetch,
   '<link rel="icon" href="' + base + '/favicon.svg" type="image/svg+xml">',
+  '<link rel="preconnect" href="https://fonts.googleapis.com">',
+  '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>',
+  '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Itim&display=swap">',
   '<link rel="preconnect" href="https://script.google.com" crossorigin>',
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<link rel="dns-prefetch" href="https://script.google.com">',

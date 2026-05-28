@@ -32,7 +32,7 @@ body,
 body.app-shell,
 body.login-mode,
 #app-root.app-shell {
-  font-family: 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Itim', 'Sarabun', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--text);
   -webkit-font-smoothing: antialiased;
 }
