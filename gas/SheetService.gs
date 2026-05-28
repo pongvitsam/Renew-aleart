@@ -562,27 +562,6 @@ var SheetService = (function () {
     if (!lic) throw new Error('ไม่พบใบอนุญาต');
 
     var steps = parseJson_(lic.steps, CONFIG.DEFAULT_STEPS.slice());
-    var lastStep = steps.length ? steps[steps.length - 1] : '';
-    var status = String(lic.status || '');
-    var ready = status === lastStep;
-    if (!ready && lastStep) {
-      var hist = readTable_(CONFIG.SHEETS.HISTORY);
-      var licHist = [];
-      hist.forEach(function (h) {
-        if (String(h.licenseId) === String(licenseId)) licHist.push(h);
-      });
-      var lastStartIdx = -1;
-      licHist.forEach(function (h, idx) {
-        if (h.action === 'เริ่มรอบติดตามใหม่') lastStartIdx = idx;
-      });
-      var progressHist = lastStartIdx >= 0 ? licHist.slice(lastStartIdx + 1) : licHist;
-      var done = {};
-      progressHist.forEach(function (h) { if (h.action) done[h.action] = true; });
-      ready = steps.every(function (s) { return done[s]; });
-    }
-    if (!ready) {
-      throw new Error('ยังดำเนินการขั้นตอนไม่ครบ — บันทึกขั้นตอน "เสร็จสิ้นสมบูรณ์" ก่อนเริ่มรอบใหม่');
-    }
 
     var cycles = parseJson_(lic.renewalCycles, []);
     var today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
