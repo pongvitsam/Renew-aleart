@@ -2445,8 +2445,7 @@ async function saveLicenseExpiryDate(licenseId) {
       alertMonths: license.alertMonths,
       driveUrl: license.driveUrl || '',
       steps: license.steps || [],
-      status: license.status,
-      renewalCycles: license.renewalCycles || []
+      status: license.status
     });
   } catch (err) {
     showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
