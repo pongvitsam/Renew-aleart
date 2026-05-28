@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '31';
+const ASSET_V = '32';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -184,6 +184,7 @@ const html = [
   departmentModal,
   userAdminModal,
   '</${d}>',
+  '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js" crossorigin="anonymous"></script>',
   '<script src="/Renew-aleart/assets/js/config.js?v=' + ASSET_V + '"></script>',
   '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=' + ASSET_V + '"></script>',
   '</body></html>'

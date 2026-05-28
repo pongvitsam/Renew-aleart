@@ -34,7 +34,7 @@ Renew-aleart/
 
 รันฟังก์ชัน **`installDailyTrigger()`** ใน Editor หนึ่งครั้ง
 
-## 2) ตั้งค่า Frontend
+## 2) ตั้งค่า Frontend (Google Sheets)
 
 แก้ไฟล์ `docs/assets/js/config.js`:
 
@@ -53,6 +53,16 @@ const CONFIG = {
 
 1. Repo → **Settings** → **Pages** → Source: **GitHub Actions**
 2. Push ขึ้น `main` → workflow `Deploy GitHub Pages` จะ deploy โฟลเดอร์ `docs/`
+
+## ทางเลือก: Supabase (PostgreSQL)
+
+ใช้ Supabase แทน Google Sheets ได้ — ดูคู่มือเต็มที่ [`supabase/README.md`](supabase/README.md)
+
+สรุปสั้นๆ:
+
+1. รัน SQL ใน `supabase/migrations/`  
+2. ตั้ง `DATA_PROVIDER: 'supabase'` + `SUPABASE_URL` + `SUPABASE_ANON_KEY` ใน `config.js`  
+3. `npm run build:index` แล้ว deploy Pages  
 
 ## API Actions (POST JSON)
 

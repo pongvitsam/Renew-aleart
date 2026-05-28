@@ -129,8 +129,29 @@ const Api = {
     return { ...data, sessionToken: token };
   },
 
+  usesSupabase() {
+    return typeof CONFIG !== 'undefined' &&
+      CONFIG.DATA_PROVIDER === 'supabase' &&
+      typeof SupabaseApi !== 'undefined' &&
+      SupabaseClient.isConfigured();
+  },
+
   async call(action, data = {}, opts = {}) {
     if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
+
+    if (this.usesSupabase()) {
+      try {
+        return await SupabaseApi.invoke(action, data, opts);
+      } catch (err) {
+        if (action !== 'login' && action !== 'logout' &&
+          /เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) &&
+          typeof Auth !== 'undefined') {
+          Auth.forceLogout(err.message);
+        }
+        throw err;
+      }
+    }
+
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
 
@@ -328,6 +349,7 @@ const Api = {
   },
 
   ping() {
+    if (this.usesSupabase()) return SupabaseApi.ping();
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API_URL'));
     const url = apiUrl + (apiUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=ping';
