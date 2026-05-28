@@ -468,6 +468,64 @@ var SheetService = (function () {
     return { success: true };
   }
 
+  function cancelTimelineStep(data) {
+    var licenseId = data.licenseId;
+    var step = String(data.step || '').trim();
+    if (!licenseId) throw new Error('ไม่พบใบอนุญาต');
+    if (!step) throw new Error('ไม่พบขั้นตอนที่ต้องการยกเลิก');
+
+    var ss = ensureInitialized();
+    var historySheet = ss.getSheetByName(CONFIG.SHEETS.HISTORY);
+    if (!historySheet) throw new Error('ไม่พบตารางประวัติ');
+    var lastRow = historySheet.getLastRow();
+    if (lastRow < 2) throw new Error('ยังไม่มีประวัติให้ยกเลิก');
+
+    var headers = historySheet.getRange(1, 1, 1, historySheet.getLastColumn()).getValues()[0];
+    var licCol = headers.indexOf('licenseId') + 1;
+    var actionCol = headers.indexOf('action') + 1;
+    if (licCol < 1) licCol = 2;
+    if (actionCol < 1) actionCol = 4;
+
+    var targetRow = -1;
+    for (var r = lastRow; r >= 2; r--) {
+      var rowLicenseId = String(historySheet.getRange(r, licCol).getValue());
+      if (rowLicenseId !== String(licenseId)) continue;
+      var rowAction = String(historySheet.getRange(r, actionCol).getValue() || '');
+      if (rowAction !== step) {
+        throw new Error('ยกเลิกได้เฉพาะขั้นตอนล่าสุดเท่านั้น');
+      }
+      targetRow = r;
+      break;
+    }
+
+    if (targetRow < 2) throw new Error('ไม่พบขั้นตอนที่ต้องการยกเลิก');
+    historySheet.deleteRow(targetRow);
+
+    var lic = getLicenseRow_(licenseId);
+    if (!lic) throw new Error('ไม่พบใบอนุญาต');
+    var steps = parseJson_(lic.steps, CONFIG.DEFAULT_STEPS.slice());
+    var status = reconcileStatusAfterStepsChange_(licenseId, steps, '');
+    upsertRow_(CONFIG.SHEETS.LICENSES, Number(licenseId), {
+      id: licenseId,
+      projectId: lic.projectId,
+      name: lic.name,
+      issueDate: formatDateValue_(lic.issueDate),
+      expiryDate: formatDateValue_(lic.expiryDate),
+      alertMonths: Number(lic.alertMonths) || 3,
+      driveUrl: lic.driveUrl || '',
+      status: status,
+      steps: lic.steps,
+      renewalCycles: lic.renewalCycles || '[]',
+      createdAt: lic.createdAt || ''
+    }, [
+      'id', 'projectId', 'name', 'issueDate', 'expiryDate', 'alertMonths',
+      'driveUrl', 'status', 'steps', 'renewalCycles', 'createdAt', 'updatedAt'
+    ]);
+
+    invalidateCache_();
+    return { success: true, licenseId: licenseId, status: status };
+  }
+
   function getLicenseRow_(licenseId) {
     var rows = readTable_(CONFIG.SHEETS.LICENSES);
     for (var i = 0; i < rows.length; i++) {
@@ -644,6 +702,7 @@ var SheetService = (function () {
     saveLicense: saveLicense,
     saveLicenseSteps: saveLicenseSteps,
     saveTimelineUpdate: saveTimelineUpdate,
+    cancelTimelineStep: cancelTimelineStep,
     completeRenewal: completeRenewal,
     saveSettings: saveSettings,
     getSettings: getSettings_,

@@ -300,6 +300,12 @@ const Api = {
     return res;
   },
 
+  async cancelTimelineStep(data) {
+    const res = await this.call('cancelTimelineStep', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
   async completeRenewal(data) {
     const res = await this.call('completeRenewal', data, { skipCache: true });
     this.scheduleBackgroundRefresh();

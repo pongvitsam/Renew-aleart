@@ -433,6 +433,26 @@ const Mutations = {
     return found;
   },
 
+  cancelTimelineStepLocal(licenseId, step) {
+    let found = null;
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) !== Number(licenseId)) return;
+        found = { project: p, license: l };
+        if (!Array.isArray(l.history) || !l.history.length) return;
+        for (let i = l.history.length - 1; i >= 0; i -= 1) {
+          if (String(l.history[i].action || '') === String(step || '')) {
+            l.history.splice(i, 1);
+            break;
+          }
+        }
+        l.status = Utils.resolveStatusAfterStepsChangeForLicense(l, l.steps || [], l.status);
+      });
+    });
+    if (found) this.persist();
+    return found;
+  },
+
   completeRenewalLocal(licenseId, issueDate, expiryDate, note) {
     let license = null;
     App.projects.forEach(p => {
@@ -961,6 +981,12 @@ const Api = {
 
   async saveTimelineUpdate(data) {
     const res = await this.call('saveTimelineUpdate', data, { skipCache: true });
+    this.scheduleBackgroundRefresh();
+    return res;
+  },
+
+  async cancelTimelineStep(data) {
+    const res = await this.call('cancelTimelineStep', data, { skipCache: true });
     this.scheduleBackgroundRefresh();
     return res;
   },
@@ -2010,6 +2036,7 @@ const TimelineUI = {
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
     const nextPendingIdx = steps.findIndex(s => !roundHist.some(h => h.action === s));
+    const lastDoneIdx = nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx - 1;
 
     const flow = document.createElement('div');
     flow.className = 'timeline-flow';
@@ -2019,13 +2046,14 @@ const TimelineUI = {
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
-      const canSave = (!done && idx === (nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx)) || current;
+      const canSave = !done && idx === nextPendingIdx;
+      const canCancel = done && idx === lastDoneIdx;
 
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
       row.disabled = !canSave;
-      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ');
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (canCancel ? 'ยกเลิกขั้นตอนล่าสุดได้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ'));
       row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
@@ -2057,6 +2085,19 @@ const TimelineUI = {
         pin.className = 'text-[11px] text-indigo-600 font-bold mt-2';
         pin.textContent = 'กดเพื่อบันทึกขั้นตอนนี้';
         body.appendChild(pin);
+      }
+
+      if (canCancel) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'mt-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 underline';
+        cancelBtn.textContent = 'ยกเลิกขั้นตอนนี้';
+        cancelBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cancelTimelineStepQuick(step);
+        };
+        body.appendChild(cancelBtn);
       }
 
       row.append(dot, body);
@@ -2195,9 +2236,14 @@ window.saveLicenseSteps = saveLicenseSteps;
 
 function saveTimelineStepQuick(step) {
   App._timelineQuickStep = step;
-  const stepEl = document.getElementById('update-step');
-  if (stepEl) stepEl.value = step;
-  saveTimelineUpdate();
+  const promptValue = window.prompt('หมายเหตุสำหรับขั้นตอน "' + step + '" (ไม่บังคับ)', '');
+  if (promptValue === null) return;
+  const note = promptValue;
+  saveTimelineUpdate(step, note);
+}
+
+function cancelTimelineStepQuick(step) {
+  if (typeof cancelTimelineStep === 'function') cancelTimelineStep(step);
 }
 
 /* app-renewal.js */
@@ -2316,7 +2362,7 @@ async function saveCompleteRenewal(licenseId) {
   Mutations.completeRenewalLocal(licenseId, issueDate, expiryDate, note);
   showToast('เริ่มรอบติดตามใหม่ — ล้างประวัติรอบเก่าแล้ว');
   renderTimeline(App.currentProjectId, licenseId);
-  renderProjectView(App.currentProjectId);
+  refreshCurrentView({ skipSidebar: true });
 
   try {
     await Api.completeRenewal({ licenseId, issueDate, expiryDate, note });
@@ -2333,6 +2379,7 @@ window.saveCompleteRenewal = saveCompleteRenewal;
 
 /* app-dashboard.js */
 App.dashboardStatusFilter = 'all';
+App._dashboardCollapsedProjects = App._dashboardCollapsedProjects || {};
 
 const DASHBOARD_STATUS_FILTERS = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -2507,7 +2554,7 @@ function renderProjectsStatusList() {
   const projects = getFilteredDashboardProjects();
   const summary = document.createElement('p');
   summary.className = 'text-xs text-slate-500 mb-3';
-  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อเปิดรายละเอียด';
+  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อพับ/ขยายรายละเอียด';
   wrap.appendChild(summary);
 
   if (!projects.length) {
@@ -2601,10 +2648,14 @@ function appendStatusListSection(wrap, group, projects, startRank) {
 
 function buildProjectListRow(project, rank) {
   const st = Utils.getProjectStatus(project);
+  const collapsed = !!App._dashboardCollapsedProjects[project.id];
   const tr = document.createElement('tr');
   tr.className = 'status-list-row row-' + st.status;
-  tr.title = 'เปิดโครงการ';
-  tr.onclick = () => renderProjectView(project.id);
+  tr.title = collapsed ? 'คลิกเพื่อแสดงรายละเอียด' : 'คลิกเพื่อซ่อนรายละเอียด';
+  tr.onclick = () => {
+    App._dashboardCollapsedProjects[project.id] = !App._dashboardCollapsedProjects[project.id];
+    patchDashboard();
+  };
 
   const urgentDays = Utils.nearestUrgentExpiryDays(project);
   let urgentText = '—';
@@ -2622,7 +2673,7 @@ function buildProjectListRow(project, rank) {
     : '0';
 
   tr.innerHTML =
-    '<td class="col-rank" data-label="#">' + rank + '</td>' +
+    '<td class="col-rank" data-label="#">' + rank + ' <i class="fa-solid ' + (collapsed ? 'fa-chevron-right' : 'fa-chevron-down') + ' text-slate-400 ml-1"></i></td>' +
     '<td class="col-name" data-label="โครงการ"><span class="font-bold text-slate-800">' +
       Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</span></td>' +
     '<td class="col-dept" data-label="แผนก">' + Utils.escapeHtml(project.department || '—') + '</td>' +
@@ -2633,7 +2684,57 @@ function buildProjectListRow(project, rank) {
       (hasDrive ? '<i class="fa-brands fa-google-drive text-blue-600" title="มีลิงก์"></i>' : '—') +
     '</td>';
 
-  return tr;
+  const frag = document.createDocumentFragment();
+  frag.appendChild(tr);
+  if (!collapsed) frag.appendChild(buildProjectDetailInlineRow(project));
+  return frag;
+}
+
+function buildProjectDetailInlineRow(project) {
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'status-list-detail-row';
+  const td = document.createElement('td');
+  td.colSpan = 7;
+  td.className = 'bg-slate-50/70 p-3';
+
+  const licenses = project.licenses || [];
+  if (!licenses.length) {
+    td.innerHTML = '<p class="text-xs text-slate-500">ยังไม่มีใบอนุญาตในโครงการนี้</p>';
+    detailTr.appendChild(td);
+    return detailTr;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'grid grid-cols-1 xl:grid-cols-2 gap-2';
+  licenses.forEach(l => {
+    const st = Utils.calculateStatus(l.expiryDate, Utils.getEffectiveAlertMonths(l.alertMonths));
+    const item = document.createElement('div');
+    item.className = 'rounded-xl border bg-white px-3 py-2 flex items-center justify-between gap-3';
+    item.innerHTML =
+      '<div class="min-w-0">' +
+        '<p class="text-xs font-bold text-slate-800 truncate">' + Utils.escapeHtml(l.name) + '</p>' +
+        '<p class="text-[11px] text-slate-500 mt-0.5">หมดอายุ: ' + Utils.formatDate(l.expiryDate) + ' · ขั้นตอน: ' + Utils.escapeHtml(l.status || 'ยังไม่เริ่ม') + '</p>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 shrink-0">' +
+        '<span class="status-pill ' + st.status + '">' + st.text + '</span>' +
+        '<button type="button" class="text-[11px] font-bold text-indigo-600 border border-indigo-200 bg-indigo-50 px-2.5 py-1 rounded-lg">ขั้นตอน</button>' +
+      '</div>';
+    item.querySelector('button').onclick = () => renderTimeline(project.id, l.id);
+    list.appendChild(item);
+  });
+
+  const foot = document.createElement('div');
+  foot.className = 'mt-2 text-right';
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'text-[11px] font-bold text-slate-600 hover:text-slate-900 underline';
+  openBtn.textContent = 'เปิดหน้าโครงการเต็ม';
+  openBtn.onclick = () => renderProjectView(project.id);
+  foot.appendChild(openBtn);
+
+  td.append(list, foot);
+  detailTr.appendChild(td);
+  return detailTr;
 }
 
 function makeStatCard(num, label, icon, tone) {
@@ -2985,12 +3086,13 @@ async function saveLicense() {
   }
 }
 
-async function saveTimelineUpdate() {
+async function saveTimelineUpdate(stepFromWorkflow, noteFromWorkflow) {
   const licenseId = document.getElementById('update-license-id').value;
   const stepEl = document.getElementById('update-step');
-  const step = (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
-  const note = document.getElementById('update-note').value.trim();
-  if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
+  const step = (stepFromWorkflow || '').trim() || (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
+  const noteInput = document.getElementById('update-note');
+  const note = String(noteFromWorkflow ?? (noteInput ? noteInput.value : '')).trim();
+  if (!step) return showToast('กรุณาระบุขั้นตอน', 'error');
 
   const project = App.projects.find(p => Number(p.id) === Number(App.currentProjectId));
   const license = project?.licenses?.find(l => Number(l.id) === Number(licenseId));
@@ -2998,9 +3100,9 @@ async function saveTimelineUpdate() {
   const completedFinal = !!step && !!lastStep && step === lastStep;
 
   Mutations.timelineUpdateLocal(licenseId, step, note);
-  document.getElementById('update-note').value = '';
+  if (noteInput) noteInput.value = '';
   renderTimeline(App.currentProjectId, Number(licenseId));
-  renderProjectView(App.currentProjectId);
+  refreshCurrentView({ skipSidebar: true });
   showToast('บันทึกขั้นตอนแล้ว');
   if (completedFinal) {
     showToast('ขั้นตอนครบแล้ว — กรุณากรอกวันเริ่ม/หมดอายุรอบถัดไป', 'success');
@@ -3017,6 +3119,25 @@ async function saveTimelineUpdate() {
     Api.refreshInBackground();
   } finally {
     App._timelineQuickStep = '';
+  }
+}
+
+async function cancelTimelineStep(step) {
+  const licenseId = document.getElementById('update-license-id').value;
+  if (!licenseId || !step) return;
+  if (!confirm('ยกเลิกขั้นตอน "' + step + '" ใช่หรือไม่?')) return;
+
+  const found = Mutations.cancelTimelineStepLocal(licenseId, step);
+  if (!found) return showToast('ไม่พบข้อมูลขั้นตอน', 'error');
+  renderTimeline(App.currentProjectId, Number(licenseId));
+  refreshCurrentView({ skipSidebar: true });
+  showToast('ยกเลิกขั้นตอนแล้ว');
+
+  try {
+    await Api.cancelTimelineStep({ licenseId, step });
+  } catch (err) {
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
   }
 }
 
@@ -3081,7 +3202,7 @@ async function sendTestEmail() {
 
 Object.assign(window, {
   handleEmailInput, openProjectModal, saveProject, deleteProject, openLicenseModal, saveLicense,
-  saveTimelineUpdate, openTestEmailModal, openTestEmailModalFromNav, updateMockEmailPreview, sendTestEmail
+  saveTimelineUpdate, cancelTimelineStep, openTestEmailModal, openTestEmailModalFromNav, updateMockEmailPreview, sendTestEmail
 });
 
 /* app-main.js */

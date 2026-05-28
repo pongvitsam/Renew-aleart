@@ -1,4 +1,5 @@
 App.dashboardStatusFilter = 'all';
+App._dashboardCollapsedProjects = App._dashboardCollapsedProjects || {};
 
 const DASHBOARD_STATUS_FILTERS = [
   { id: 'all', label: 'ทั้งหมด' },
@@ -173,7 +174,7 @@ function renderProjectsStatusList() {
   const projects = getFilteredDashboardProjects();
   const summary = document.createElement('p');
   summary.className = 'text-xs text-slate-500 mb-3';
-  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อเปิดรายละเอียด';
+  summary.textContent = 'พบ ' + projects.length + ' โครงการ — คลิกแถวเพื่อพับ/ขยายรายละเอียด';
   wrap.appendChild(summary);
 
   if (!projects.length) {
@@ -267,10 +268,14 @@ function appendStatusListSection(wrap, group, projects, startRank) {
 
 function buildProjectListRow(project, rank) {
   const st = Utils.getProjectStatus(project);
+  const collapsed = !!App._dashboardCollapsedProjects[project.id];
   const tr = document.createElement('tr');
   tr.className = 'status-list-row row-' + st.status;
-  tr.title = 'เปิดโครงการ';
-  tr.onclick = () => renderProjectView(project.id);
+  tr.title = collapsed ? 'คลิกเพื่อแสดงรายละเอียด' : 'คลิกเพื่อซ่อนรายละเอียด';
+  tr.onclick = () => {
+    App._dashboardCollapsedProjects[project.id] = !App._dashboardCollapsedProjects[project.id];
+    patchDashboard();
+  };
 
   const urgentDays = Utils.nearestUrgentExpiryDays(project);
   let urgentText = '—';
@@ -288,7 +293,7 @@ function buildProjectListRow(project, rank) {
     : '0';
 
   tr.innerHTML =
-    '<td class="col-rank" data-label="#">' + rank + '</td>' +
+    '<td class="col-rank" data-label="#">' + rank + ' <i class="fa-solid ' + (collapsed ? 'fa-chevron-right' : 'fa-chevron-down') + ' text-slate-400 ml-1"></i></td>' +
     '<td class="col-name" data-label="โครงการ"><span class="font-bold text-slate-800">' +
       Utils.escapeHtml(project.name) + demoBadgeHtml(project.isDemo) + '</span></td>' +
     '<td class="col-dept" data-label="แผนก">' + Utils.escapeHtml(project.department || '—') + '</td>' +
@@ -299,7 +304,57 @@ function buildProjectListRow(project, rank) {
       (hasDrive ? '<i class="fa-brands fa-google-drive text-blue-600" title="มีลิงก์"></i>' : '—') +
     '</td>';
 
-  return tr;
+  const frag = document.createDocumentFragment();
+  frag.appendChild(tr);
+  if (!collapsed) frag.appendChild(buildProjectDetailInlineRow(project));
+  return frag;
+}
+
+function buildProjectDetailInlineRow(project) {
+  const detailTr = document.createElement('tr');
+  detailTr.className = 'status-list-detail-row';
+  const td = document.createElement('td');
+  td.colSpan = 7;
+  td.className = 'bg-slate-50/70 p-3';
+
+  const licenses = project.licenses || [];
+  if (!licenses.length) {
+    td.innerHTML = '<p class="text-xs text-slate-500">ยังไม่มีใบอนุญาตในโครงการนี้</p>';
+    detailTr.appendChild(td);
+    return detailTr;
+  }
+
+  const list = document.createElement('div');
+  list.className = 'grid grid-cols-1 xl:grid-cols-2 gap-2';
+  licenses.forEach(l => {
+    const st = Utils.calculateStatus(l.expiryDate, Utils.getEffectiveAlertMonths(l.alertMonths));
+    const item = document.createElement('div');
+    item.className = 'rounded-xl border bg-white px-3 py-2 flex items-center justify-between gap-3';
+    item.innerHTML =
+      '<div class="min-w-0">' +
+        '<p class="text-xs font-bold text-slate-800 truncate">' + Utils.escapeHtml(l.name) + '</p>' +
+        '<p class="text-[11px] text-slate-500 mt-0.5">หมดอายุ: ' + Utils.formatDate(l.expiryDate) + ' · ขั้นตอน: ' + Utils.escapeHtml(l.status || 'ยังไม่เริ่ม') + '</p>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 shrink-0">' +
+        '<span class="status-pill ' + st.status + '">' + st.text + '</span>' +
+        '<button type="button" class="text-[11px] font-bold text-indigo-600 border border-indigo-200 bg-indigo-50 px-2.5 py-1 rounded-lg">ขั้นตอน</button>' +
+      '</div>';
+    item.querySelector('button').onclick = () => renderTimeline(project.id, l.id);
+    list.appendChild(item);
+  });
+
+  const foot = document.createElement('div');
+  foot.className = 'mt-2 text-right';
+  const openBtn = document.createElement('button');
+  openBtn.type = 'button';
+  openBtn.className = 'text-[11px] font-bold text-slate-600 hover:text-slate-900 underline';
+  openBtn.textContent = 'เปิดหน้าโครงการเต็ม';
+  openBtn.onclick = () => renderProjectView(project.id);
+  foot.appendChild(openBtn);
+
+  td.append(list, foot);
+  detailTr.appendChild(td);
+  return detailTr;
 }
 
 function makeStatCard(num, label, icon, tone) {

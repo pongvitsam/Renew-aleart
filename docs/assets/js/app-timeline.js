@@ -16,6 +16,7 @@ const TimelineUI = {
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
     const nextPendingIdx = steps.findIndex(s => !roundHist.some(h => h.action === s));
+    const lastDoneIdx = nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx - 1;
 
     const flow = document.createElement('div');
     flow.className = 'timeline-flow';
@@ -25,13 +26,14 @@ const TimelineUI = {
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
-      const canSave = (!done && idx === (nextPendingIdx < 0 ? steps.length - 1 : nextPendingIdx)) || current;
+      const canSave = !done && idx === nextPendingIdx;
+      const canCancel = done && idx === lastDoneIdx;
 
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
       row.disabled = !canSave;
-      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ');
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : (canCancel ? 'ยกเลิกขั้นตอนล่าสุดได้' : (done ? 'บันทึกแล้ว' : 'กรุณาบันทึกขั้นตอนก่อนหน้าให้ครบ'));
       row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
@@ -63,6 +65,19 @@ const TimelineUI = {
         pin.className = 'text-[11px] text-indigo-600 font-bold mt-2';
         pin.textContent = 'กดเพื่อบันทึกขั้นตอนนี้';
         body.appendChild(pin);
+      }
+
+      if (canCancel) {
+        const cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'mt-2 text-[11px] font-bold text-rose-600 hover:text-rose-700 underline';
+        cancelBtn.textContent = 'ยกเลิกขั้นตอนนี้';
+        cancelBtn.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          cancelTimelineStepQuick(step);
+        };
+        body.appendChild(cancelBtn);
       }
 
       row.append(dot, body);
@@ -201,7 +216,12 @@ window.saveLicenseSteps = saveLicenseSteps;
 
 function saveTimelineStepQuick(step) {
   App._timelineQuickStep = step;
-  const stepEl = document.getElementById('update-step');
-  if (stepEl) stepEl.value = step;
-  saveTimelineUpdate();
+  const promptValue = window.prompt('หมายเหตุสำหรับขั้นตอน "' + step + '" (ไม่บังคับ)', '');
+  if (promptValue === null) return;
+  const note = promptValue;
+  saveTimelineUpdate(step, note);
+}
+
+function cancelTimelineStepQuick(step) {
+  if (typeof cancelTimelineStep === 'function') cancelTimelineStep(step);
 }

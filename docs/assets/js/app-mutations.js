@@ -91,6 +91,26 @@ const Mutations = {
     return found;
   },
 
+  cancelTimelineStepLocal(licenseId, step) {
+    let found = null;
+    App.projects.forEach(p => {
+      (p.licenses || []).forEach(l => {
+        if (Number(l.id) !== Number(licenseId)) return;
+        found = { project: p, license: l };
+        if (!Array.isArray(l.history) || !l.history.length) return;
+        for (let i = l.history.length - 1; i >= 0; i -= 1) {
+          if (String(l.history[i].action || '') === String(step || '')) {
+            l.history.splice(i, 1);
+            break;
+          }
+        }
+        l.status = Utils.resolveStatusAfterStepsChangeForLicense(l, l.steps || [], l.status);
+      });
+    });
+    if (found) this.persist();
+    return found;
+  },
+
   completeRenewalLocal(licenseId, issueDate, expiryDate, note) {
     let license = null;
     App.projects.forEach(p => {

@@ -86,6 +86,9 @@ function routeAction_(action, data) {
     case 'saveTimelineUpdate':
       SheetService.saveTimelineUpdate(data);
       return { success: true, licenseId: data.licenseId };
+    case 'cancelTimelineStep':
+      SheetService.cancelTimelineStep(data);
+      return { success: true, licenseId: data.licenseId, step: data.step };
     case 'completeRenewal': {
       var renewal = SheetService.completeRenewal(data);
       return { success: true, licenseId: renewal.licenseId, round: renewal.round };

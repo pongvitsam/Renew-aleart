@@ -113,7 +113,7 @@ async function saveCompleteRenewal(licenseId) {
   Mutations.completeRenewalLocal(licenseId, issueDate, expiryDate, note);
   showToast('เริ่มรอบติดตามใหม่ — ล้างประวัติรอบเก่าแล้ว');
   renderTimeline(App.currentProjectId, licenseId);
-  renderProjectView(App.currentProjectId);
+  refreshCurrentView({ skipSidebar: true });
 
   try {
     await Api.completeRenewal({ licenseId, issueDate, expiryDate, note });

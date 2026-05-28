@@ -178,12 +178,13 @@ async function saveLicense() {
   }
 }
 
-async function saveTimelineUpdate() {
+async function saveTimelineUpdate(stepFromWorkflow, noteFromWorkflow) {
   const licenseId = document.getElementById('update-license-id').value;
   const stepEl = document.getElementById('update-step');
-  const step = (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
-  const note = document.getElementById('update-note').value.trim();
-  if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
+  const step = (stepFromWorkflow || '').trim() || (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
+  const noteInput = document.getElementById('update-note');
+  const note = String(noteFromWorkflow ?? (noteInput ? noteInput.value : '')).trim();
+  if (!step) return showToast('กรุณาระบุขั้นตอน', 'error');
 
   const project = App.projects.find(p => Number(p.id) === Number(App.currentProjectId));
   const license = project?.licenses?.find(l => Number(l.id) === Number(licenseId));
@@ -191,9 +192,9 @@ async function saveTimelineUpdate() {
   const completedFinal = !!step && !!lastStep && step === lastStep;
 
   Mutations.timelineUpdateLocal(licenseId, step, note);
-  document.getElementById('update-note').value = '';
+  if (noteInput) noteInput.value = '';
   renderTimeline(App.currentProjectId, Number(licenseId));
-  renderProjectView(App.currentProjectId);
+  refreshCurrentView({ skipSidebar: true });
   showToast('บันทึกขั้นตอนแล้ว');
   if (completedFinal) {
     showToast('ขั้นตอนครบแล้ว — กรุณากรอกวันเริ่ม/หมดอายุรอบถัดไป', 'success');
@@ -210,6 +211,25 @@ async function saveTimelineUpdate() {
     Api.refreshInBackground();
   } finally {
     App._timelineQuickStep = '';
+  }
+}
+
+async function cancelTimelineStep(step) {
+  const licenseId = document.getElementById('update-license-id').value;
+  if (!licenseId || !step) return;
+  if (!confirm('ยกเลิกขั้นตอน "' + step + '" ใช่หรือไม่?')) return;
+
+  const found = Mutations.cancelTimelineStepLocal(licenseId, step);
+  if (!found) return showToast('ไม่พบข้อมูลขั้นตอน', 'error');
+  renderTimeline(App.currentProjectId, Number(licenseId));
+  refreshCurrentView({ skipSidebar: true });
+  showToast('ยกเลิกขั้นตอนแล้ว');
+
+  try {
+    await Api.cancelTimelineStep({ licenseId, step });
+  } catch (err) {
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
   }
 }
 
@@ -274,5 +294,5 @@ async function sendTestEmail() {
 
 Object.assign(window, {
   handleEmailInput, openProjectModal, saveProject, deleteProject, openLicenseModal, saveLicense,
-  saveTimelineUpdate, openTestEmailModal, openTestEmailModalFromNav, updateMockEmailPreview, sendTestEmail
+  saveTimelineUpdate, cancelTimelineStep, openTestEmailModal, openTestEmailModalFromNav, updateMockEmailPreview, sendTestEmail
 });

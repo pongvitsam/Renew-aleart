@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '37';
+const ASSET_V = '39';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -83,8 +83,7 @@ const timelineModal = modal('timelineModal', 'max-w-5xl h-[90vh]', `
 <${d} class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5">
 <${d} class="bg-white rounded-2xl border shadow-sm p-4"><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>
 <${d} class="bg-white rounded-2xl border shadow-sm flex flex-col min-h-[340px]"><${d} class="p-4 border-b"><input type="hidden" id="update-license-id">
-<label class="text-xs font-bold text-slate-600 block mt-1">หมายเหตุ<textarea id="update-note" rows="3" placeholder="พิมพ์หมายเหตุเพิ่มเติม (ไม่บังคับ)" class="w-full border rounded-xl p-2.5 text-sm mt-1"></textarea></label>
-<button type="button" onclick="saveTimelineUpdate()" class="w-full mt-3 btn-primary py-2.5 text-sm">บันทึกหมายเหตุ</button></${d}>
+<p class="text-xs text-slate-500">เพิ่มหมายเหตุได้ตอนกดแต่ละขั้นตอนในส่วนความคืบหน้า</p></${d}>
 <${d} class="p-4 flex-1 overflow-y-auto bg-slate-50 custom-scrollbar"><p class="text-sm font-bold text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-1"></i>ประวัติ <span id="log-count" class="text-indigo-600">0</span></p><${d} id="history-log-container"></${d}></${d}></${d}>
 </${d}></${d}>`);
 
