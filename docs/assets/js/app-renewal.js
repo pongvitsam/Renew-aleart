@@ -39,9 +39,11 @@ const RenewalUI = {
       (ready ? 'border-emerald-300 bg-emerald-50/60' : 'border-slate-200 bg-slate-50');
 
     if (ready) {
+      App._renewalInputOpen = App._renewalInputOpen || {};
+      const inputOpen = !!App._renewalInputOpen[license.id];
       const title = document.createElement('p');
       title.className = 'text-sm font-bold text-emerald-800 mb-3';
-      title.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> ขั้นตอนครบแล้ว — กรอกวันสำหรับรอบติดตามถัดไป';
+      title.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> ขั้นตอนครบแล้ว';
       formWrap.appendChild(title);
 
       const hint = document.createElement('p');
@@ -49,40 +51,49 @@ const RenewalUI = {
       hint.textContent = 'เมื่อเริ่มรอบใหม่ ระบบจะลบประวัติขั้นตอนและ log ของรอบเก่าทั้งหมด';
       formWrap.appendChild(hint);
 
-      const grid = document.createElement('div');
-      grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3';
+      if (!inputOpen) {
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'w-full btn-primary py-2.5 text-sm';
+        openBtn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> ต่ออายุเรียบร้อย';
+        openBtn.onclick = () => openRenewalInputForm(license.id);
+        formWrap.appendChild(openBtn);
+      } else {
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4 mb-3';
 
-      const issueLbl = document.createElement('label');
-      issueLbl.className = 'text-xs font-bold block';
-      issueLbl.innerHTML = '<span class="block mb-1">วันเริ่มรอบใหม่ *</span>';
-      const issueMount = document.createElement('div');
-      issueLbl.appendChild(issueMount);
+        const issueLbl = document.createElement('label');
+        issueLbl.className = 'text-xs font-bold block';
+        issueLbl.innerHTML = '<span class="block mb-1">วันเริ่มรอบใหม่ *</span>';
+        const issueMount = document.createElement('div');
+        issueLbl.appendChild(issueMount);
 
-      const expiryLbl = document.createElement('label');
-      expiryLbl.className = 'text-xs font-bold block';
-      expiryLbl.innerHTML = '<span class="block mb-1">วันหมดอายุรอบใหม่ *</span>';
-      const expiryMount = document.createElement('div');
-      expiryLbl.appendChild(expiryMount);
+        const expiryLbl = document.createElement('label');
+        expiryLbl.className = 'text-xs font-bold block';
+        expiryLbl.innerHTML = '<span class="block mb-1">วันหมดอายุรอบใหม่ *</span>';
+        const expiryMount = document.createElement('div');
+        expiryLbl.appendChild(expiryMount);
 
-      grid.append(issueLbl, expiryLbl);
-      formWrap.appendChild(grid);
+        grid.append(issueLbl, expiryLbl);
+        formWrap.appendChild(grid);
 
-      const noteLbl = document.createElement('label');
-      noteLbl.className = 'text-xs font-bold block mb-3';
-      noteLbl.innerHTML = 'หมายเหตุ (ไม่บังคับ)<textarea id="renewal-note" rows="2" class="w-full border rounded-lg p-2 text-sm mt-1" placeholder="เช่น ต่อใบอนุญาตครั้งที่ 2"></textarea>';
-      formWrap.appendChild(noteLbl);
+        const noteLbl = document.createElement('label');
+        noteLbl.className = 'text-xs font-bold block mb-3';
+        noteLbl.innerHTML = 'หมายเหตุ (ไม่บังคับ)<textarea id="renewal-note" rows="2" class="w-full border rounded-lg p-2 text-sm mt-1" placeholder="เช่น ต่อใบอนุญาตครั้งที่ 2"></textarea>';
+        formWrap.appendChild(noteLbl);
+
+        ThaiDatePicker.mount(issueMount, { id: 'renewal-issue-date', placeholder: 'เลือกวันเริ่ม' });
+        ThaiDatePicker.mount(expiryMount, { id: 'renewal-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
+      }
 
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'w-full btn-primary py-2.5 text-sm';
+      btn.className = 'w-full btn-primary py-2.5 text-sm mt-2 ' + (inputOpen ? '' : 'hidden');
       btn.innerHTML = '<i class="fa-solid fa-rotate mr-1"></i> บันทึกและเริ่มรอบติดตามใหม่';
       btn.onclick = () => saveCompleteRenewal(license.id);
       formWrap.appendChild(btn);
 
       panel.appendChild(formWrap);
-
-      ThaiDatePicker.mount(issueMount, { id: 'renewal-issue-date', placeholder: 'เลือกวันเริ่ม' });
-      ThaiDatePicker.mount(expiryMount, { id: 'renewal-expiry-date', placeholder: 'เลือกวันหมดอายุ' });
     } else {
       formWrap.innerHTML =
         '<p class="text-sm text-slate-600"><i class="fa-solid fa-info-circle mr-1"></i> เมื่อบันทึกขั้นตอน <b>เสร็จสิ้นสมบูรณ์</b> ครบแล้ว จึงจะกรอกวันเริ่ม/หมดอายุรอบถัดไปได้</p>';
@@ -131,6 +142,8 @@ async function saveCompleteRenewal(licenseId) {
   }
 
   Mutations.completeRenewalLocal(licenseId, issueDate, expiryDate, note);
+  App._renewalInputOpen = App._renewalInputOpen || {};
+  App._renewalInputOpen[licenseId] = false;
   showToast('เริ่มรอบติดตามใหม่ — ล้างประวัติรอบเก่าแล้ว');
   renderTimeline(App.currentProjectId, licenseId);
   refreshCurrentView({ skipSidebar: true });
@@ -147,6 +160,14 @@ async function saveCompleteRenewal(licenseId) {
 }
 
 window.saveCompleteRenewal = saveCompleteRenewal;
+
+function openRenewalInputForm(licenseId) {
+  App._renewalInputOpen = App._renewalInputOpen || {};
+  App._renewalInputOpen[licenseId] = true;
+  renderTimeline(App.currentProjectId, licenseId);
+}
+
+window.openRenewalInputForm = openRenewalInputForm;
 
 async function saveLicenseExpiryDate(licenseId) {
   const newExpiryDate = ThaiDatePicker.getValue('renewal-edit-expiry-date');
