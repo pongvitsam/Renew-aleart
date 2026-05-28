@@ -191,36 +191,6 @@ async function renderTimeline(projectId, licenseId) {
 }
 
 function paintTimelineModal(license) {
-  const lockMap = App._timelineStepsEditorLocked || {};
-  const isEditorLocked = !!lockMap[license.id];
-  const editorBox = document.querySelector('#timelineModal .steps-editor-box');
-  if (editorBox) editorBox.classList.toggle('hidden', isEditorLocked);
-  const headerWrap = document.querySelector('#timelineModal .p-5.border-b.bg-white');
-  if (headerWrap) {
-    let hint = document.getElementById('timeline-steps-lock-hint');
-    if (!hint) {
-      hint = document.createElement('p');
-      hint.id = 'timeline-steps-lock-hint';
-      hint.className = 'text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3 hidden';
-      hint.textContent = 'ล็อกการแก้ไขขั้นตอนแล้ว — หากยกเลิกขั้นตอนล่าสุด ระบบจะเปิดให้แก้ไขขั้นตอนได้อีกครั้ง';
-      headerWrap.prepend(hint);
-    }
-    hint.classList.toggle('hidden', !isEditorLocked);
-  }
-
-  const stepsEdit = document.getElementById('timeline-steps-edit');
-  if (stepsEdit && !isEditorLocked) {
-    const defaultSteps = [
-      'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
-      'ขอเอกสารสนับสนุนจากลูกค้า',
-      'ได้รับเอกสารครบถ้วน',
-      'ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ',
-      'แจ้งผลให้ลูกค้าทราบ',
-      'เสร็จสิ้นสมบูรณ์'
-    ];
-    stepsEdit.value = Utils.formatStepsText(license.steps?.length ? license.steps : defaultSteps);
-  }
-  TimelineUI.render(license);
   RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
 }

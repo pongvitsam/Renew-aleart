@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '39';
+const ASSET_V = '40';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -71,14 +71,7 @@ const timelineModal = modal('timelineModal', 'max-w-5xl h-[90vh]', `
 <${d} class="modal-header modal-header--purple"><span><i class="fa-solid fa-list-check mr-2"></i><span id="timelineModalTitle">ขั้นตอนใบอนุญาต</span></span><button type="button" onclick="closeModal('timelineModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="timeline-modal-shell flex-1 overflow-y-auto bg-slate-50 custom-scrollbar">
 <${d} class="p-5 border-b bg-white">
-<${d} class="steps-editor-box mb-4">
-<h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-pen-to-square text-indigo-500"></i> แก้ไขขั้นตอนดำเนินการ</h4>
-<p class="text-xs text-slate-500 mb-2">แก้ไขได้ตลอดเวลา — หนึ่งบรรทัดต่อหนึ่งขั้นตอน</p>
-<textarea id="timeline-steps-edit" rows="6" class="w-full border rounded-xl p-2.5 text-sm bg-white" placeholder="1. ขั้นตอนแรก&#10;2. ขั้นตอนถัดไป"></textarea>
-<button type="button" onclick="saveLicenseSteps()" class="w-full mt-2 bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm"><i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกรายการขั้นตอน</button>
-</${d}>
-<h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ความคืบหน้า (ซ้าย → ขวา)</h4>
-<${d} id="timeline-container" class="mb-2"></${d}>
+<p class="text-xs text-slate-600"><i class="fa-solid fa-circle-info mr-1 text-indigo-500"></i> ใช้หน้านี้สำหรับดูประวัติและจัดการรอบต่ออายุ พร้อมแก้ไขวันหมดอายุ</p>
 </${d}>
 <${d} class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-5">
 <${d} class="bg-white rounded-2xl border shadow-sm p-4"><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>

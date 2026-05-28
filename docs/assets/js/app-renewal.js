@@ -13,6 +13,26 @@ const RenewalUI = {
       '<p class="text-sm mt-1"><span class="text-slate-500">วันหมดอายุ:</span> <b>' + Utils.formatDate(license.expiryDate) + '</b></p>';
     panel.appendChild(current);
 
+    const editExpiry = document.createElement('div');
+    editExpiry.className = 'mb-4 p-3 rounded-xl border border-blue-200 bg-blue-50/60';
+    editExpiry.innerHTML =
+      '<p class="text-xs font-bold text-blue-800 uppercase mb-2"><i class="fa-solid fa-calendar-days mr-1"></i> แก้ไขวันหมดอายุ</p>' +
+      '<label class="text-xs font-bold block mb-2">วันหมดอายุใหม่</label>';
+    const expiryMount = document.createElement('div');
+    editExpiry.appendChild(expiryMount);
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'w-full mt-3 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 py-2 rounded-lg';
+    saveBtn.innerHTML = '<i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกวันหมดอายุ';
+    saveBtn.onclick = () => saveLicenseExpiryDate(license.id);
+    editExpiry.appendChild(saveBtn);
+    panel.appendChild(editExpiry);
+    ThaiDatePicker.mount(expiryMount, {
+      id: 'renewal-edit-expiry-date',
+      placeholder: 'เลือกวันหมดอายุใหม่',
+      value: license.expiryDate || ''
+    });
+
     const ready = Utils.isRenewalStepsComplete(license);
     const formWrap = document.createElement('div');
     formWrap.className = 'renewal-form-wrap mb-4 p-3 rounded-xl border ' +
@@ -127,3 +147,40 @@ async function saveCompleteRenewal(licenseId) {
 }
 
 window.saveCompleteRenewal = saveCompleteRenewal;
+
+async function saveLicenseExpiryDate(licenseId) {
+  const newExpiryDate = ThaiDatePicker.getValue('renewal-edit-expiry-date');
+  if (!newExpiryDate) return showToast('กรุณาเลือกวันหมดอายุ', 'error');
+
+  const project = Mutations.findProject(App.currentProjectId);
+  const license = Mutations.findLicense(App.currentProjectId, licenseId);
+  if (!project || !license) return showToast('ไม่พบข้อมูลใบอนุญาต', 'error');
+  if (new Date(newExpiryDate + 'T12:00:00') <= new Date(license.issueDate + 'T12:00:00')) {
+    return showToast('วันหมดอายุต้องหลังวันเริ่ม', 'error');
+  }
+
+  Mutations.updateLicenseDatesLocal(App.currentProjectId, licenseId, license.issueDate, newExpiryDate);
+  showToast('บันทึกวันหมดอายุแล้ว');
+  renderTimeline(App.currentProjectId, licenseId);
+  refreshCurrentView({ skipSidebar: true });
+
+  try {
+    await Api.saveLicense({
+      id: license.id,
+      projectId: project.id,
+      name: license.name,
+      issueDate: license.issueDate,
+      expiryDate: newExpiryDate,
+      alertMonths: license.alertMonths,
+      driveUrl: license.driveUrl || '',
+      steps: license.steps || [],
+      status: license.status,
+      renewalCycles: license.renewalCycles || []
+    });
+  } catch (err) {
+    showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
+    Api.refreshInBackground();
+  }
+}
+
+window.saveLicenseExpiryDate = saveLicenseExpiryDate;
