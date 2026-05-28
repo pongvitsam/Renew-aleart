@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '40';
+const ASSET_V = '41';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
