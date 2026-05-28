@@ -89,6 +89,10 @@ async function loadProjects() {
       if (paintProjectsUi()) {
         if (stalePack?.stale) showSyncIndicator();
         Api.scheduleDeferredSync(!!stalePack?.stale);
+      } else {
+        // มี cache แต่ไม่มีโครงการ usable (เช่น cache ว่าง) ต้องบังคับซิงค์
+        showSyncIndicator();
+        Api.scheduleDeferredSync(true);
       }
       return;
     }

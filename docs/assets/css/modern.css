@@ -229,11 +229,12 @@ main.app-main {
 }
 
 .page-hint {
-  background: var(--primary-soft) !important;
-  border: 1px solid #e0e7ff !important;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%) !important;
+  border: 1px solid #c7d2fe !important;
   border-radius: var(--radius-lg) !important;
-  color: #4338ca !important;
+  color: #3730a3 !important;
   font-size: 0.8125rem;
+  box-shadow: 0 8px 22px -16px rgba(67, 56, 202, 0.45);
 }
 
 .page-tabs {
@@ -608,24 +609,33 @@ html.app-ready #app-root:not(.hidden) {
 
 .timeline-flow {
   display: flex;
-  align-items: stretch;
-  gap: 0.4rem;
+  align-items: flex-start;
+  gap: 0.55rem;
   overflow-x: auto;
-  padding-bottom: 0.5rem;
+  padding: 0.25rem 0.15rem 0.75rem;
 }
 
 .timeline-step-horizontal {
   min-width: 220px;
   max-width: 260px;
-  background: transparent;
-  border: none;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-xs);
   text-align: left;
-  padding: 0;
+  padding: 0.7rem 0.75rem;
   cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
 }
 
 .timeline-step-horizontal::before {
   display: none !important;
+}
+
+.timeline-step-horizontal:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+  border-color: #c7d2fe;
 }
 
 .timeline-step-horizontal:disabled {
@@ -633,9 +643,14 @@ html.app-ready #app-root:not(.hidden) {
   opacity: 0.88;
 }
 
+.timeline-step-horizontal .timeline-dot {
+  margin-bottom: 0.5rem;
+}
+
 .timeline-step-horizontal .timeline-body {
-  border-radius: var(--radius);
-  min-height: 120px;
+  border-radius: calc(var(--radius) - 2px);
+  min-height: 112px;
+  background: #fff;
 }
 
 .timeline-arrow {
