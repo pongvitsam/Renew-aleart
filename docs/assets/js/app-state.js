@@ -16,8 +16,13 @@ function applyServerData(res) {
 
 function paintProjectsUi() {
   if (!hasUsableProjectData()) return false;
-  refreshCurrentView();
   hideSetupBanner();
+  const paint = () => refreshCurrentView({ fast: true });
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(paint);
+  } else {
+    paint();
+  }
   return true;
 }
 
@@ -30,14 +35,14 @@ function onProjectsLoaded(res) {
   } else if (res._empty && App._syncing) {
     showSetupBanner('กำลังซิงค์ข้อมูลจากเซิร์ฟเวอร์ครั้งแรก — อาจใช้เวลาสักครู่');
   }
-  refreshCurrentView();
+  refreshCurrentView({ forceFull: true });
 }
 
 function onProjectsLoadError(err) {
   hideSyncIndicator();
   if (!DataCache.get() && !DataCache.getStale()) {
     showSetupBanner(err.message || 'โหลดข้อมูลไม่สำเร็จ');
-    refreshCurrentView();
+    refreshCurrentView({ forceFull: true });
   }
 }
 

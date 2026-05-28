@@ -127,8 +127,17 @@ const Mutations = {
   }
 };
 
-function refreshCurrentView() {
-  renderSidebar(true);
-  if (App.currentView === 'dashboard') showDashboard();
+function refreshCurrentView(opts) {
+  opts = opts || {};
+  if (App.currentView === 'dashboard' && !opts.forceFull) {
+    const shell = document.getElementById('dashboard-shell');
+    if (shell && typeof patchDashboard === 'function') {
+      patchDashboard();
+      if (!opts.skipSidebar) renderSidebar(true);
+      return;
+    }
+  }
+  if (!opts.skipSidebar) renderSidebar(true);
+  if (App.currentView === 'dashboard') showDashboard({ skipSidebar: true });
   else if (App.currentProjectId) renderProjectView(App.currentProjectId);
 }

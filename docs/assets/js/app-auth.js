@@ -50,7 +50,12 @@ const Auth = {
 
   warmupApi() {
     if (!CONFIG?.API_URL?.trim()) return;
-    Api.ping().catch(() => {});
+    const run = () => Api.ping().catch(() => {});
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 4000 });
+    } else {
+      setTimeout(run, 2500);
+    }
   },
 
   showLogin() {

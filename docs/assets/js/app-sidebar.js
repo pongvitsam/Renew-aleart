@@ -1,9 +1,20 @@
 let _sidebarSearchBound = false;
+let _sidebarCacheKey = '';
+
+function sidebarCacheKey() {
+  const search = document.getElementById('project-search');
+  const term = search ? search.value.trim().toLowerCase() : '';
+  return (App._projectsRev || 0) + '|' + App.projects.length + '|' + App.currentProjectId + '|' + term;
+}
 
 function renderSidebar(light) {
   const container = document.getElementById('project-list-container');
   const searchInput = document.getElementById('project-search');
   if (!container) return;
+
+  const cacheKey = sidebarCacheKey();
+  if (light && cacheKey === _sidebarCacheKey) return;
+  _sidebarCacheKey = cacheKey;
 
   if (!_sidebarSearchBound && searchInput) {
     _sidebarSearchBound = true;

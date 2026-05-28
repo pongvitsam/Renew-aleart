@@ -463,9 +463,18 @@ const Mutations = {
   }
 };
 
-function refreshCurrentView() {
-  renderSidebar(true);
-  if (App.currentView === 'dashboard') showDashboard();
+function refreshCurrentView(opts) {
+  opts = opts || {};
+  if (App.currentView === 'dashboard' && !opts.forceFull) {
+    const shell = document.getElementById('dashboard-shell');
+    if (shell && typeof patchDashboard === 'function') {
+      patchDashboard();
+      if (!opts.skipSidebar) renderSidebar(true);
+      return;
+    }
+  }
+  if (!opts.skipSidebar) renderSidebar(true);
+  if (App.currentView === 'dashboard') showDashboard({ skipSidebar: true });
   else if (App.currentProjectId) renderProjectView(App.currentProjectId);
 }
 
@@ -488,8 +497,13 @@ function applyServerData(res) {
 
 function paintProjectsUi() {
   if (!hasUsableProjectData()) return false;
-  refreshCurrentView();
   hideSetupBanner();
+  const paint = () => refreshCurrentView({ fast: true });
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(paint);
+  } else {
+    paint();
+  }
   return true;
 }
 
@@ -502,14 +516,14 @@ function onProjectsLoaded(res) {
   } else if (res._empty && App._syncing) {
     showSetupBanner('กำลังซิงค์ข้อมูลจากเซิร์ฟเวอร์ครั้งแรก — อาจใช้เวลาสักครู่');
   }
-  refreshCurrentView();
+  refreshCurrentView({ forceFull: true });
 }
 
 function onProjectsLoadError(err) {
   hideSyncIndicator();
   if (!DataCache.get() && !DataCache.getStale()) {
     showSetupBanner(err.message || 'โหลดข้อมูลไม่สำเร็จ');
-    refreshCurrentView();
+    refreshCurrentView({ forceFull: true });
   }
 }
 
@@ -636,166 +650,6 @@ function demoBadgeHtml(isDemo) {
 window.toggleSidebar = toggleSidebar;
 window.loadProjects = loadProjects;
 window.demoBadgeHtml = demoBadgeHtml;
-
-/* supabase-client.js */
-/** Lazy Supabase client (ต้องโหลด @supabase/supabase-js ก่อน) */
-const SupabaseClient = {
-  _client: null,
-
-  isConfigured() {
-    return !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY);
-  },
-
-  get() {
-    if (!this.isConfigured()) {
-      throw new Error('ยังไม่ได้ตั้งค่า SUPABASE_URL และ SUPABASE_ANON_KEY ใน config.js');
-    }
-    if (!window.supabase || typeof window.supabase.createClient !== 'function') {
-      throw new Error('ไม่พบ Supabase SDK — รีเฟรชหน้าหรือรัน build-index ใหม่');
-    }
-    if (!this._client) {
-      this._client = window.supabase.createClient(
-        CONFIG.SUPABASE_URL.trim(),
-        CONFIG.SUPABASE_ANON_KEY.trim()
-      );
-    }
-    return this._client;
-  }
-};
-
-/* supabase-api.js */
-/**
- * Backend ผ่าน Supabase RPC — ใช้เมื่อ CONFIG.DATA_PROVIDER === 'supabase'
- */
-const SupabaseApi = {
-  async rpc(fn, params) {
-    const { data, error } = await SupabaseClient.get().rpc(fn, params);
-    if (error) {
-      throw new Error(error.message || 'Supabase RPC ล้มเหลว');
-    }
-    if (data && data.success === false) {
-      throw new Error(data.error || 'คำขอล้มเหลว');
-    }
-    return data;
-  },
-
-  tokenFrom(data) {
-    return (typeof AuthStore !== 'undefined' ? AuthStore.getToken() : null) ||
-      data.sessionToken || null;
-  },
-
-  async invoke(action, data = {}, opts = {}) {
-    const token = this.tokenFrom(data);
-
-    if (action === 'getProjects' && !opts.skipCache) {
-      const cached = DataCache.get();
-      if (cached) return { success: true, ...cached };
-    }
-
-    let res;
-    switch (action) {
-      case 'ping':
-        res = { success: true, message: 'Renew Aleart Supabase', version: '2.0.0' };
-        break;
-      case 'login':
-        res = await this.rpc('api_login', {
-          p_username: data.username,
-          p_password: data.password
-        });
-        break;
-      case 'logout':
-        res = await this.rpc('api_logout', { p_token: token });
-        break;
-      case 'validateSession':
-        res = await this.rpc('api_validate_session', { p_token: token });
-        break;
-      case 'listUsers':
-        res = await this.rpc('api_list_users', { p_token: token });
-        break;
-      case 'saveUser':
-        res = await this.rpc('api_save_user', { p_token: token, p_data: data });
-        break;
-      case 'deleteUser':
-        res = await this.rpc('api_delete_user', {
-          p_token: token,
-          p_user_id: Number(data.id)
-        });
-        break;
-      case 'getProjects':
-        res = await this.rpc('api_get_projects', { p_token: token });
-        res._fromApi = true;
-        if (res.projects) {
-          DataCache.set({ projects: res.projects, departments: res.departments });
-        }
-        break;
-      case 'getLicenseDetail':
-        res = await this.rpc('api_get_license_detail', {
-          p_token: token,
-          p_license_id: Number(data.licenseId)
-        });
-        break;
-      case 'saveProject':
-        res = await this.rpc('api_save_project', { p_token: token, p_data: data });
-        break;
-      case 'deleteProject':
-        res = await this.rpc('api_delete_project', {
-          p_token: token,
-          p_project_id: Number(data.id)
-        });
-        break;
-      case 'saveLicense': {
-        const payload = { ...data };
-        if (typeof payload.steps === 'string') {
-          payload.steps = payload.steps.split('\n').map(s => s.trim()).filter(Boolean);
-        } else if (!payload.steps) {
-          payload.steps = [
-            'แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง',
-            'ขอเอกสารสนับสนุนจากลูกค้า',
-            'ได้รับเอกสารครบถ้วน',
-            'ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ',
-            'แจ้งผลให้ลูกค้าทราบ',
-            'เสร็จสิ้นสมบูรณ์'
-          ];
-        }
-        res = await this.rpc('api_save_license', { p_token: token, p_data: payload });
-        break;
-      }
-      case 'saveLicenseSteps':
-        res = await this.rpc('api_save_license_steps', { p_token: token, p_data: data });
-        break;
-      case 'saveTimelineUpdate':
-        res = await this.rpc('api_save_timeline_update', { p_token: token, p_data: data });
-        break;
-      case 'completeRenewal':
-        res = await this.rpc('api_complete_renewal', { p_token: token, p_data: data });
-        break;
-      case 'saveDepartment':
-        res = await this.rpc('api_save_department', { p_token: token, p_data: data });
-        break;
-      case 'deleteDepartment':
-        res = await this.rpc('api_delete_department', {
-          p_token: token,
-          p_dept_id: Number(data.id)
-        });
-        break;
-      case 'sendTestEmail':
-        throw new Error('การส่งอีเมลยังไม่รองรับในโหมด Supabase — ใช้ DATA_PROVIDER: "gas" หรือตั้งค่า SMTP แยก');
-      case 'setupSpreadsheet':
-        throw new Error('setupSpreadsheet ใช้กับ Google Sheets เท่านั้น');
-      default:
-        throw new Error('Unknown action: ' + action);
-    }
-
-    if (action === 'login' && /เข้าสู่ระบบ|Unauthorized|เซสชัน/i.test(String(res?.error || ''))) {
-      /* handled by rpc throw */
-    }
-    return res;
-  },
-
-  ping() {
-    return Promise.resolve({ success: true, message: 'Renew Aleart Supabase', version: '2.0.0' });
-  }
-};
 
 /* api.js */
 const Api = {
@@ -929,29 +783,8 @@ const Api = {
     return { ...data, sessionToken: token };
   },
 
-  usesSupabase() {
-    return typeof CONFIG !== 'undefined' &&
-      CONFIG.DATA_PROVIDER === 'supabase' &&
-      typeof SupabaseApi !== 'undefined' &&
-      SupabaseClient.isConfigured();
-  },
-
   async call(action, data = {}, opts = {}) {
     if (typeof CONFIG === 'undefined') throw new Error('โหลด config.js ไม่สำเร็จ');
-
-    if (this.usesSupabase()) {
-      try {
-        return await SupabaseApi.invoke(action, data, opts);
-      } catch (err) {
-        if (action !== 'login' && action !== 'logout' &&
-          /เข้าสู่ระบบ|เซสชัน|Unauthorized/i.test(err.message) &&
-          typeof Auth !== 'undefined') {
-          Auth.forceLogout(err.message);
-        }
-        throw err;
-      }
-    }
-
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) throw new Error('ยังไม่ได้ตั้งค่า API_URL');
 
@@ -992,6 +825,7 @@ const Api = {
     if (res.departments) App.departments = res.departments;
     if (res.projects) {
       DataCache.set({ projects: App.projects, departments: App.departments });
+      App._projectsRev = (App._projectsRev || 0) + 1;
     }
     if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
     return res;
@@ -1050,7 +884,7 @@ const Api = {
         DataCache.set({ projects: res.projects, departments: res.departments });
         hideSyncIndicator();
         if (nextFp !== prevFp && typeof refreshCurrentView === 'function') {
-          refreshCurrentView();
+          refreshCurrentView({ forceFull: true });
         }
         return res;
       })
@@ -1149,7 +983,6 @@ const Api = {
   },
 
   ping() {
-    if (this.usesSupabase()) return SupabaseApi.ping();
     const apiUrl = (CONFIG.API_URL || '').trim();
     if (!apiUrl) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API_URL'));
     const url = apiUrl + (apiUrl.indexOf('?') >= 0 ? '&' : '?') + 'action=ping';
@@ -1231,7 +1064,12 @@ const Auth = {
 
   warmupApi() {
     if (!CONFIG?.API_URL?.trim()) return;
-    Api.ping().catch(() => {});
+    const run = () => Api.ping().catch(() => {});
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 4000 });
+    } else {
+      setTimeout(run, 2500);
+    }
   },
 
   showLogin() {
@@ -1624,11 +1462,22 @@ window.updateSidebarNav = updateSidebarNav;
 
 /* app-sidebar.js */
 let _sidebarSearchBound = false;
+let _sidebarCacheKey = '';
+
+function sidebarCacheKey() {
+  const search = document.getElementById('project-search');
+  const term = search ? search.value.trim().toLowerCase() : '';
+  return (App._projectsRev || 0) + '|' + App.projects.length + '|' + App.currentProjectId + '|' + term;
+}
 
 function renderSidebar(light) {
   const container = document.getElementById('project-list-container');
   const searchInput = document.getElementById('project-search');
   if (!container) return;
+
+  const cacheKey = sidebarCacheKey();
+  if (light && cacheKey === _sidebarCacheKey) return;
+  _sidebarCacheKey = cacheKey;
 
   if (!_sidebarSearchBound && searchInput) {
     _sidebarSearchBound = true;
@@ -2400,26 +2249,79 @@ const DASHBOARD_PRIORITY_GROUPS = [
   { status: 'empty', label: 'ไม่มีใบอนุญาต', icon: 'fa-inbox', headerClass: 'text-slate-600 bg-slate-100 border-slate-200', defaultOpen: false }
 ];
 
-function showDashboard() {
+function getDashboardCounts() {
+  let totalLics = 0, expCount = 0, warnCount = 0;
+  App.projects.forEach(p => {
+    const c = Utils.licenseCounts(p.licenses);
+    totalLics += c.total;
+    expCount += c.expired;
+    warnCount += c.warning;
+  });
+  return { totalLics, expCount, warnCount };
+}
+
+function updateDashboardStats() {
+  const grid = document.getElementById('dashboard-stats-grid');
+  if (!grid) return;
+  const { totalLics, expCount, warnCount } = getDashboardCounts();
+  const vals = grid.querySelectorAll('.stat-card__value');
+  if (vals.length >= 4) {
+    vals[0].textContent = String(App.projects.length);
+    vals[1].textContent = String(totalLics);
+    vals[2].textContent = String(warnCount);
+    vals[3].textContent = String(expCount);
+  }
+}
+
+function updateDashboardFilterChips() {
+  document.querySelectorAll('.status-filter-chip').forEach(chip => {
+    const id = chip.dataset.filter;
+    chip.classList.toggle('active', id === App.dashboardStatusFilter);
+  });
+}
+
+function patchDashboard() {
+  const shell = document.getElementById('dashboard-shell');
+  if (!shell || App.dashboardTab === 'calendar') {
+    showDashboard({ skipSidebar: true });
+    return;
+  }
+  updateDashboardStats();
+  updateDashboardFilterChips();
+  const mount = document.getElementById('dashboard-list-mount');
+  if (mount) mount.replaceChildren(renderProjectsStatusList());
+}
+
+function showDashboard(opts) {
+  opts = opts || {};
   App.currentView = 'dashboard';
   App.currentProjectId = null;
   App.dashboardTab = App.dashboardTab || 'overview';
   if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
-  renderSidebar(true);
+  if (!opts.skipSidebar) renderSidebar(true);
 
-  document.getElementById('page-title').innerHTML =
-    '<i class="fa-solid fa-chart-pie text-indigo-500"></i> ภาพรวมระบบ';
+  const title = document.getElementById('page-title');
+  if (title) {
+    title.innerHTML = '<i class="fa-solid fa-chart-pie text-indigo-500"></i> ภาพรวมระบบ';
+  }
 
   const content = document.getElementById('main-content');
+  if (!content) return;
   content.replaceChildren();
+  content.classList.add('page-enter');
+
+  const shell = document.createElement('div');
+  shell.id = 'dashboard-shell';
+  shell.className = 'dashboard-shell';
 
   const hint = document.createElement('div');
   hint.className = 'page-hint';
   hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
-  content.appendChild(hint);
+  shell.appendChild(hint);
 
   const tabs = document.createElement('div');
   tabs.className = 'page-tabs';
+  tabs.id = 'dashboard-tabs';
   ['overview', 'calendar'].forEach(tab => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -2428,36 +2330,40 @@ function showDashboard() {
     btn.innerHTML = tab === 'overview'
       ? '<i class="fa-solid fa-list mr-1"></i> รายการสถานะ'
       : '<i class="fa-solid fa-calendar-days mr-1"></i> ปฏิทิน';
-    btn.onclick = () => { App.dashboardTab = tab; showDashboard(); };
+    btn.onclick = () => { App.dashboardTab = tab; showDashboard({ skipSidebar: true }); };
     tabs.appendChild(btn);
   });
-  content.appendChild(tabs);
+  shell.appendChild(tabs);
 
   if (App.dashboardTab === 'calendar') {
-    renderCalendarPanel(content);
+    renderCalendarPanel(shell);
+    content.appendChild(shell);
     return;
   }
 
-  let totalLics = 0, expCount = 0, warnCount = 0;
-  App.projects.forEach(p => {
-    const c = Utils.licenseCounts(p.licenses);
-    totalLics += c.total;
-    expCount += c.expired;
-    warnCount += c.warning;
-  });
-
+  const { totalLics, expCount, warnCount } = getDashboardCounts();
   const grid = document.createElement('div');
-  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6';
+  grid.id = 'dashboard-stats-grid';
+  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stat-grid-stagger';
   grid.append(
     makeStatCard(App.projects.length, 'โครงการ', 'fa-building', 'indigo'),
     makeStatCard(totalLics, 'ใบอนุญาต', 'fa-file-contract', 'slate'),
     makeStatCard(warnCount, 'ใกล้หมดอายุ', 'fa-clock', 'amber'),
     makeStatCard(expCount, 'หมดอายุ', 'fa-triangle-exclamation', 'rose')
   );
-  content.appendChild(grid);
+  shell.appendChild(grid);
 
-  content.appendChild(buildDashboardToolbar());
-  content.appendChild(renderProjectsStatusList());
+  const toolbarMount = document.createElement('div');
+  toolbarMount.id = 'dashboard-toolbar-mount';
+  toolbarMount.appendChild(buildDashboardToolbar());
+  shell.appendChild(toolbarMount);
+
+  const listMount = document.createElement('div');
+  listMount.id = 'dashboard-list-mount';
+  listMount.appendChild(renderProjectsStatusList());
+  shell.appendChild(listMount);
+
+  content.appendChild(shell);
 }
 
 function buildDashboardToolbar() {
@@ -2475,8 +2381,8 @@ function buildDashboardToolbar() {
   search.value = App._dashboardSearch || '';
   search.addEventListener('input', Utils.debounce(e => {
     App._dashboardSearch = e.target.value;
-    showDashboard();
-  }, 200));
+    patchDashboard();
+  }, 120));
   searchWrap.appendChild(search);
 
   const filters = document.createElement('div');
@@ -2484,11 +2390,12 @@ function buildDashboardToolbar() {
   DASHBOARD_STATUS_FILTERS.forEach(f => {
     const chip = document.createElement('button');
     chip.type = 'button';
+    chip.dataset.filter = f.id;
     chip.className = 'status-filter-chip' + (App.dashboardStatusFilter === f.id ? ' active' : '');
     chip.textContent = f.label;
     chip.onclick = () => {
       App.dashboardStatusFilter = f.id;
-      showDashboard();
+      patchDashboard();
     };
     filters.appendChild(chip);
   });
@@ -2669,6 +2576,7 @@ function makeStatCard(num, label, icon, tone) {
 }
 
 window.showDashboard = showDashboard;
+window.patchDashboard = patchDashboard;
 
 /* app-project.js */
 function renderProjectView(projectId) {

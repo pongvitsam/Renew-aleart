@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '32';
+const ASSET_V = '33';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -130,6 +130,7 @@ const html = [
   '<link rel="preconnect" href="https://script.googleusercontent.com" crossorigin>',
   '<link rel="dns-prefetch" href="https://script.google.com">',
   '<link rel="dns-prefetch" href="https://script.googleusercontent.com">',
+  '<link rel="preload" href="' + base + '/assets/js/app.bundle.js?v=' + ASSET_V + '" as="script">',
   '<link rel="stylesheet" href="' + base + '/assets/css/tailwind.css?v=' + ASSET_V + '">',
   '<link rel="stylesheet" href="' + base + '/assets/css/app.css?v=' + ASSET_V + '">',
   '<link rel="stylesheet" href="' + base + '/assets/css/modern.css?v=' + ASSET_V + '">',
@@ -166,10 +167,10 @@ const html = [
   `</${d}>`,
   `<${d} class="sidebar-search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="project-search" placeholder="ค้นหาโครงการ..." class="sidebar-search"></${d}>`,
   `<${d} id="project-list-container" class="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4"></${d}>`,
-  `<${d} class="p-4 border-t border-slate-800 space-y-2">` +
-  `<p id="sidebar-user-label" class="text-xs text-slate-400 truncate px-1"></p>` +
+  `<${d} class="sidebar-footer p-4 border-t space-y-2">` +
+  `<p id="sidebar-user-label" class="sidebar-user-text truncate px-1"></p>` +
   `<button type="button" onclick="logout()" class="nav-item nav-item-logout w-full"><span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span><span class="nav-text">ออกจากระบบ</span></button>` +
-  `<p class="text-xs text-slate-500 text-center">&copy; Pongvit Y. 2026 License</p></${d}>`,
+  `<p class="sidebar-copy text-center">&copy; Pongvit Y. 2026</p></${d}>`,
   '</aside>',
   `<${d} id="sidebar-overlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden"></${d}>`,
   '<main class="app-main flex-1 flex flex-col min-w-0 pt-16 md:pt-0">',
@@ -184,7 +185,6 @@ const html = [
   departmentModal,
   userAdminModal,
   '</${d}>',
-  '<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.8/dist/umd/supabase.min.js" crossorigin="anonymous"></script>',
   '<script src="/Renew-aleart/assets/js/config.js?v=' + ASSET_V + '"></script>',
   '<script defer src="/Renew-aleart/assets/js/app.bundle.js?v=' + ASSET_V + '"></script>',
   '</body></html>'

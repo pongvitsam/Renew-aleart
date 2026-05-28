@@ -357,6 +357,7 @@ main.app-main {
   padding: 0.4rem 0.85rem !important;
   border: 1px solid var(--border) !important;
   background: var(--surface) !important;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .status-filter-chip.active {
   background: linear-gradient(135deg, #6366f1, #7c3aed) !important;
@@ -520,4 +521,87 @@ main.app-main {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ─── Performance & motion ─────────────────────────────────────────────── */
+
+.page-enter {
+  animation: page-fade-in 0.28s ease-out both;
+}
+@keyframes page-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.stat-grid-stagger .stat-card {
+  animation: card-rise 0.35s ease-out both;
+}
+.stat-grid-stagger .stat-card:nth-child(1) { animation-delay: 0.02s; }
+.stat-grid-stagger .stat-card:nth-child(2) { animation-delay: 0.06s; }
+.stat-grid-stagger .stat-card:nth-child(3) { animation-delay: 0.1s; }
+.stat-grid-stagger .stat-card:nth-child(4) { animation-delay: 0.14s; }
+@keyframes card-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.status-list-scroll {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--primary-hover);
+  background: var(--primary-soft);
+  border: 1px solid #c7d2fe;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  margin-left: 0.75rem;
+}
+
+.sidebar-footer {
+  border-color: var(--border) !important;
+  background: #fafbff;
+}
+.sidebar-user-text {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.sidebar-copy {
+  font-size: 0.625rem;
+  color: #94a3b8;
+  margin: 0;
+}
+
+.page-skeleton .skeleton-block {
+  border-radius: var(--radius-lg);
+}
+.page-skeleton .skeleton-msg {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+html.app-ready #app-root:not(.hidden) {
+  animation: app-shell-in 0.2s ease-out;
+}
+@keyframes app-shell-in {
+  from { opacity: 0.92; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .stat-grid-stagger .stat-card,
+  html.app-ready #app-root:not(.hidden) {
+    animation: none !important;
+  }
+  .stat-card:hover {
+    transform: none !important;
+  }
 }

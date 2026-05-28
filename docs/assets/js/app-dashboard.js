@@ -16,26 +16,79 @@ const DASHBOARD_PRIORITY_GROUPS = [
   { status: 'empty', label: 'ไม่มีใบอนุญาต', icon: 'fa-inbox', headerClass: 'text-slate-600 bg-slate-100 border-slate-200', defaultOpen: false }
 ];
 
-function showDashboard() {
+function getDashboardCounts() {
+  let totalLics = 0, expCount = 0, warnCount = 0;
+  App.projects.forEach(p => {
+    const c = Utils.licenseCounts(p.licenses);
+    totalLics += c.total;
+    expCount += c.expired;
+    warnCount += c.warning;
+  });
+  return { totalLics, expCount, warnCount };
+}
+
+function updateDashboardStats() {
+  const grid = document.getElementById('dashboard-stats-grid');
+  if (!grid) return;
+  const { totalLics, expCount, warnCount } = getDashboardCounts();
+  const vals = grid.querySelectorAll('.stat-card__value');
+  if (vals.length >= 4) {
+    vals[0].textContent = String(App.projects.length);
+    vals[1].textContent = String(totalLics);
+    vals[2].textContent = String(warnCount);
+    vals[3].textContent = String(expCount);
+  }
+}
+
+function updateDashboardFilterChips() {
+  document.querySelectorAll('.status-filter-chip').forEach(chip => {
+    const id = chip.dataset.filter;
+    chip.classList.toggle('active', id === App.dashboardStatusFilter);
+  });
+}
+
+function patchDashboard() {
+  const shell = document.getElementById('dashboard-shell');
+  if (!shell || App.dashboardTab === 'calendar') {
+    showDashboard({ skipSidebar: true });
+    return;
+  }
+  updateDashboardStats();
+  updateDashboardFilterChips();
+  const mount = document.getElementById('dashboard-list-mount');
+  if (mount) mount.replaceChildren(renderProjectsStatusList());
+}
+
+function showDashboard(opts) {
+  opts = opts || {};
   App.currentView = 'dashboard';
   App.currentProjectId = null;
   App.dashboardTab = App.dashboardTab || 'overview';
   if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
-  renderSidebar(true);
+  if (!opts.skipSidebar) renderSidebar(true);
 
-  document.getElementById('page-title').innerHTML =
-    '<i class="fa-solid fa-chart-pie text-indigo-500"></i> ภาพรวมระบบ';
+  const title = document.getElementById('page-title');
+  if (title) {
+    title.innerHTML = '<i class="fa-solid fa-chart-pie text-indigo-500"></i> ภาพรวมระบบ';
+  }
 
   const content = document.getElementById('main-content');
+  if (!content) return;
   content.replaceChildren();
+  content.classList.add('page-enter');
+
+  const shell = document.createElement('div');
+  shell.id = 'dashboard-shell';
+  shell.className = 'dashboard-shell';
 
   const hint = document.createElement('div');
   hint.className = 'page-hint';
   hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
-  content.appendChild(hint);
+  shell.appendChild(hint);
 
   const tabs = document.createElement('div');
   tabs.className = 'page-tabs';
+  tabs.id = 'dashboard-tabs';
   ['overview', 'calendar'].forEach(tab => {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -44,36 +97,40 @@ function showDashboard() {
     btn.innerHTML = tab === 'overview'
       ? '<i class="fa-solid fa-list mr-1"></i> รายการสถานะ'
       : '<i class="fa-solid fa-calendar-days mr-1"></i> ปฏิทิน';
-    btn.onclick = () => { App.dashboardTab = tab; showDashboard(); };
+    btn.onclick = () => { App.dashboardTab = tab; showDashboard({ skipSidebar: true }); };
     tabs.appendChild(btn);
   });
-  content.appendChild(tabs);
+  shell.appendChild(tabs);
 
   if (App.dashboardTab === 'calendar') {
-    renderCalendarPanel(content);
+    renderCalendarPanel(shell);
+    content.appendChild(shell);
     return;
   }
 
-  let totalLics = 0, expCount = 0, warnCount = 0;
-  App.projects.forEach(p => {
-    const c = Utils.licenseCounts(p.licenses);
-    totalLics += c.total;
-    expCount += c.expired;
-    warnCount += c.warning;
-  });
-
+  const { totalLics, expCount, warnCount } = getDashboardCounts();
   const grid = document.createElement('div');
-  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6';
+  grid.id = 'dashboard-stats-grid';
+  grid.className = 'grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 stat-grid-stagger';
   grid.append(
     makeStatCard(App.projects.length, 'โครงการ', 'fa-building', 'indigo'),
     makeStatCard(totalLics, 'ใบอนุญาต', 'fa-file-contract', 'slate'),
     makeStatCard(warnCount, 'ใกล้หมดอายุ', 'fa-clock', 'amber'),
     makeStatCard(expCount, 'หมดอายุ', 'fa-triangle-exclamation', 'rose')
   );
-  content.appendChild(grid);
+  shell.appendChild(grid);
 
-  content.appendChild(buildDashboardToolbar());
-  content.appendChild(renderProjectsStatusList());
+  const toolbarMount = document.createElement('div');
+  toolbarMount.id = 'dashboard-toolbar-mount';
+  toolbarMount.appendChild(buildDashboardToolbar());
+  shell.appendChild(toolbarMount);
+
+  const listMount = document.createElement('div');
+  listMount.id = 'dashboard-list-mount';
+  listMount.appendChild(renderProjectsStatusList());
+  shell.appendChild(listMount);
+
+  content.appendChild(shell);
 }
 
 function buildDashboardToolbar() {
@@ -91,8 +148,8 @@ function buildDashboardToolbar() {
   search.value = App._dashboardSearch || '';
   search.addEventListener('input', Utils.debounce(e => {
     App._dashboardSearch = e.target.value;
-    showDashboard();
-  }, 200));
+    patchDashboard();
+  }, 120));
   searchWrap.appendChild(search);
 
   const filters = document.createElement('div');
@@ -100,11 +157,12 @@ function buildDashboardToolbar() {
   DASHBOARD_STATUS_FILTERS.forEach(f => {
     const chip = document.createElement('button');
     chip.type = 'button';
+    chip.dataset.filter = f.id;
     chip.className = 'status-filter-chip' + (App.dashboardStatusFilter === f.id ? ' active' : '');
     chip.textContent = f.label;
     chip.onclick = () => {
       App.dashboardStatusFilter = f.id;
-      showDashboard();
+      patchDashboard();
     };
     filters.appendChild(chip);
   });
@@ -285,3 +343,4 @@ function makeStatCard(num, label, icon, tone) {
 }
 
 window.showDashboard = showDashboard;
+window.patchDashboard = patchDashboard;

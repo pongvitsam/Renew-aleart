@@ -7,8 +7,6 @@ const files = [
   'utils.js',
   'app-mutations.js',
   'app-state.js',
-  'supabase-client.js',
-  'supabase-api.js',
   'api.js',
   'app-auth.js',
   'app-index.js',
