@@ -11,6 +11,7 @@ const files = [
   'app-auth.js',
   'app-index.js',
   'app-departments.js',
+  'app-settings.js',
   'app-users.js',
   'app-nav.js',
   'app-sidebar.js',

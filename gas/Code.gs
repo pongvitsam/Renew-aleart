@@ -57,8 +57,12 @@ function routeAction_(action, data) {
       return SnapshotService.exportSnapshotNow();
     case 'getProjects': {
       var p = SheetService.getPayload();
-      return { success: true, projects: p.projects, departments: p.departments };
+      return { success: true, projects: p.projects, departments: p.departments, settings: p.settings };
     }
+    case 'getSettings':
+      return { success: true, settings: SheetService.getSettings() };
+    case 'saveSettings':
+      return SheetService.saveSettings(data);
     case 'getLicenseDetail': {
       var lic = SheetService.getLicenseDetail(data.licenseId);
       return { success: true, license: lic };

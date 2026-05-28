@@ -1,6 +1,7 @@
 const App = {
   projects: [],
   departments: [],
+  settings: { minAlertMonths: 3 },
   expiryEvents: [],
   currentView: 'dashboard',
   currentProjectId: null,

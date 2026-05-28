@@ -7,7 +7,7 @@ const apiUrl = (configSrc.match(/API_URL:\s*'([^']+)'/) || [])[1] || '';
 const bootInline =
   '<script>(function(){var K="renew_payload_v3";' +
   'try{var raw=localStorage.getItem(K);if(raw){var o=JSON.parse(raw);if(Date.now()-o.t<6048e5){window.__BOOT_CACHE__=o.data;document.documentElement.classList.add("has-cache");}}}catch(e){}})();</script>';
-const ASSET_V = '34';
+const ASSET_V = '35';
 const base = '/Renew-aleart';
 const snapshotUrl = base + '/data/payload.json';
 const snapshotPrefetch =
@@ -80,9 +80,8 @@ const timelineModal = modal('timelineModal', 'max-w-4xl h-[90vh]', `
 <h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><i class="fa-solid fa-shoe-prints text-purple-500"></i> ความคืบหน้า</h4><${d} id="timeline-container" class="pr-2 mb-4"></${d}><h4 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2 border-t pt-4"><i class="fa-solid fa-rotate text-emerald-500"></i> รอบต่ออายุ</h4><${d} id="renewal-panel"></${d}></${d}>
 <${d} class="md:w-1/2 flex flex-col">
 <${d} class="p-4 border-b bg-white"><input type="hidden" id="update-license-id">
-<label class="text-xs font-bold text-slate-600 block mb-1">อัปเดตขั้นตอน<select id="update-step" class="w-full border rounded-xl p-2.5 text-sm mt-1"></select></label>
-<label class="text-xs font-bold text-slate-600 block mt-3">หมายเหตุ<textarea id="update-note" rows="3" placeholder="รายละเอียดเพิ่มเติม..." class="w-full border rounded-xl p-2.5 text-sm mt-1"></textarea></label>
-<button type="button" onclick="saveTimelineUpdate()" class="w-full mt-3 btn-primary py-2.5 text-sm">บันทึกขั้นตอน</button></${d}>
+<label class="text-xs font-bold text-slate-600 block mt-1">หมายเหตุ<textarea id="update-note" rows="3" placeholder="พิมพ์หมายเหตุเพิ่มเติม (ไม่บังคับ)" class="w-full border rounded-xl p-2.5 text-sm mt-1"></textarea></label>
+<button type="button" onclick="saveTimelineUpdate()" class="w-full mt-3 btn-primary py-2.5 text-sm">บันทึกหมายเหตุ</button></${d}>
 <${d} class="p-4 flex-1 overflow-y-auto bg-slate-50 custom-scrollbar"><p class="text-sm font-bold text-slate-700 mb-3"><i class="fa-solid fa-clock-rotate-left text-indigo-500 mr-1"></i>ประวัติ <span id="log-count" class="text-indigo-600">0</span></p><${d} id="history-log-container"></${d}></${d}>
 </${d}></${d}>`);
 
@@ -111,16 +110,16 @@ const departmentModal = modal('departmentModal', 'max-w-md', `
 <${d} id="department-list" class="space-y-2"></${d}>
 </${d}>`);
 
-const testModal = modal('testEmailModal', 'max-w-2xl', `
-<${d} class="modal-header modal-header--neutral"><span>ทดสอบอีเมล</span><button type="button" onclick="closeModal('testEmailModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
+const settingsModal = modal('settingsModal', 'max-w-md', `
+<${d} class="modal-header modal-header--neutral"><span>จัดการการแจ้งเตือน</span><button type="button" onclick="closeModal('settingsModal')" aria-label="ปิด"><i class="fa-solid fa-xmark"></i></button></${d}>
 <${d} class="p-5 flex-1 overflow-y-auto space-y-4">
-<label class="text-sm font-bold block">ใบอนุญาต<select id="test-email-license-select" onchange="updateMockEmailPreview()" class="w-full border rounded-xl p-3 mt-1"></select></label>
-<${d} id="mock-email-preview" class="bg-slate-50 border p-4 rounded-xl text-sm"></${d}>
-<label class="flex gap-2 text-sm"><input type="checkbox" id="test-email-save-log" checked class="mt-1"> บันทึกลงประวัติ</label>
+<p class="text-xs text-slate-500">ตั้งค่าแจ้งเตือนขั้นต่ำของระบบ (เดือน) และใช้กับทุกโครงการ</p>
+<label class="text-sm font-bold block">แจ้งเตือนล่วงหน้าอย่างน้อย (เดือน)
+<input id="settings-min-alert-months" type="number" min="1" max="24" class="w-full border rounded-xl p-3 mt-1" placeholder="เช่น 3"></label>
 </${d}>
 <${d} class="p-5 border-t flex gap-3">
-<button type="button" onclick="closeModal('testEmailModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
-<button type="button" onclick="sendTestEmail()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">ส่งทดสอบ</button>
+<button type="button" onclick="closeModal('settingsModal')" class="flex-1 border py-3 rounded-xl font-bold">ยกเลิก</button>
+<button type="button" onclick="saveAppSettings()" class="flex-[2] bg-blue-600 text-white py-3 rounded-xl font-bold">บันทึกการตั้งค่า</button>
 </${d}>`);
 
 const html = [
@@ -165,8 +164,8 @@ const html = [
   `<button type="button" data-nav="dashboard" onclick="showDashboard()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="nav-text">ภาพรวม</span></button>` +
   `<button type="button" data-nav="create" onclick="openProjectModal()" class="nav-item nav-item-accent"><span class="nav-icon"><i class="fa-solid fa-plus"></i></span><span class="nav-text">สร้างโครงการใหม่</span></button>` +
   `<p class="sidebar-label">เครื่องมือ</p>` +
+  `<button type="button" data-nav="settings" onclick="openSettingsModal()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-sliders"></i></span><span class="nav-text">จัดการ</span></button>` +
   `<button type="button" data-nav="dept" onclick="openDepartmentModal()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-building"></i></span><span class="nav-text">จัดการแผนก</span></button>` +
-  `<button type="button" data-nav="email" onclick="openTestEmailModalFromNav()" class="nav-item"><span class="nav-icon"><i class="fa-solid fa-envelope"></i></span><span class="nav-text">ทดสอบอีเมล</span></button>` +
   `<button type="button" id="admin-users-btn" data-nav="users" onclick="openUserAdminModal()" class="nav-item hidden"><span class="nav-icon"><i class="fa-solid fa-users-gear"></i></span><span class="nav-text">จัดการผู้ใช้</span></button>` +
   `</${d}>`,
   `<${d} class="sidebar-search-wrap"><i class="fa-solid fa-magnifying-glass"></i><input type="search" id="project-search" placeholder="ค้นหาโครงการ..." class="sidebar-search"></${d}>`,
@@ -185,7 +184,7 @@ const html = [
   projectModal,
   licenseModal,
   timelineModal,
-  testModal,
+  settingsModal,
   departmentModal,
   userAdminModal,
   '</${d}>',

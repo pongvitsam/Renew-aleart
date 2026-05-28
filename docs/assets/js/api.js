@@ -14,6 +14,7 @@ const Api = {
       success: true,
       projects: data.projects,
       departments: data.departments || [],
+      settings: data.settings || { minAlertMonths: 3 },
       _fromSnapshot: true
     };
   },
@@ -66,13 +67,13 @@ const Api = {
 
     const pref = await this.consumeSnapshotPrefetch();
     if (pref) {
-      DataCache.set({ projects: pref.projects, departments: pref.departments });
+      DataCache.set({ projects: pref.projects, departments: pref.departments, settings: pref.settings });
       return pref;
     }
 
     const snap = await this.fetchSnapshot(budget);
     if (snap) {
-      DataCache.set({ projects: snap.projects, departments: snap.departments });
+      DataCache.set({ projects: snap.projects, departments: snap.departments, settings: snap.settings });
       return snap;
     }
 
@@ -118,7 +119,7 @@ const Api = {
     }
     if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
     if (action === 'getProjects' && json.projects) {
-      DataCache.set({ projects: json.projects, departments: json.departments });
+      DataCache.set({ projects: json.projects, departments: json.departments, settings: json.settings });
     }
     return json;
   },
@@ -169,8 +170,9 @@ const Api = {
   applyPayload(res) {
     if (res.projects) App.projects = res.projects;
     if (res.departments) App.departments = res.departments;
+    if (res.settings) App.settings = { ...App.settings, ...res.settings };
     if (res.projects) {
-      DataCache.set({ projects: App.projects, departments: App.departments });
+      DataCache.set({ projects: App.projects, departments: App.departments, settings: App.settings });
       App._projectsRev = (App._projectsRev || 0) + 1;
     }
     if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
@@ -227,7 +229,7 @@ const Api = {
       .then(res => {
         const nextFp = this.payloadFingerprint(res);
         this.applyPayload(res);
-        DataCache.set({ projects: res.projects, departments: res.departments });
+        DataCache.set({ projects: res.projects, departments: res.departments, settings: res.settings || App.settings });
         hideSyncIndicator();
         if (nextFp !== prevFp && typeof refreshCurrentView === 'function') {
           refreshCurrentView({ forceFull: true });
@@ -265,7 +267,7 @@ const Api = {
         }
       });
     });
-    DataCache.set({ projects: App.projects, departments: App.departments });
+    DataCache.set({ projects: App.projects, departments: App.departments, settings: App.settings });
   },
 
   async saveProject(data) {
@@ -353,6 +355,17 @@ const Api = {
 
   deleteUser(data) {
     return this.call('deleteUser', data, { skipCache: true });
+  },
+
+  getSettings() {
+    return this.call('getSettings', {}, { skipCache: true });
+  },
+
+  saveSettings(data) {
+    return this.call('saveSettings', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
   },
 
 };

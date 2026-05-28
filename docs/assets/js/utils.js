@@ -30,10 +30,16 @@
     return { status: 'safe', text: 'ปกติ', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
   },
 
+  getEffectiveAlertMonths(alertMonths) {
+    const perLicense = Number(alertMonths) || 3;
+    const minGlobal = Number(App?.settings?.minAlertMonths) || 3;
+    return Math.max(perLicense, minGlobal);
+  },
+
   licenseCounts(licenses) {
     let safe = 0, warning = 0, expired = 0;
     (licenses || []).forEach(l => {
-      const s = this.calculateStatus(l.expiryDate, l.alertMonths).status;
+      const s = this.calculateStatus(l.expiryDate, this.getEffectiveAlertMonths(l.alertMonths)).status;
       if (s === 'expired') expired++;
       else if (s === 'warning') warning++;
       else safe++;
@@ -74,7 +80,7 @@
     today.setHours(0, 0, 0, 0);
     let nearest = Infinity;
     (project.licenses || []).forEach(l => {
-      const s = this.calculateStatus(l.expiryDate, l.alertMonths);
+      const s = this.calculateStatus(l.expiryDate, this.getEffectiveAlertMonths(l.alertMonths));
       if (s.status === 'expired' || s.status === 'warning') {
         const exp = new Date(l.expiryDate + 'T12:00:00');
         const days = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));

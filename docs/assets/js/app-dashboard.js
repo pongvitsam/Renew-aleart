@@ -1,4 +1,3 @@
-App.dashboardTab = 'overview';
 App.dashboardStatusFilter = 'all';
 
 const DASHBOARD_STATUS_FILTERS = [
@@ -49,7 +48,7 @@ function updateDashboardFilterChips() {
 
 function patchDashboard() {
   const shell = document.getElementById('dashboard-shell');
-  if (!shell || App.dashboardTab === 'calendar') {
+  if (!shell) {
     showDashboard({ skipSidebar: true });
     return;
   }
@@ -63,7 +62,6 @@ function showDashboard(opts) {
   opts = opts || {};
   App.currentView = 'dashboard';
   App.currentProjectId = null;
-  App.dashboardTab = App.dashboardTab || 'overview';
   if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
   if (!opts.skipSidebar) renderSidebar(true);
 
@@ -83,30 +81,8 @@ function showDashboard(opts) {
 
   const hint = document.createElement('div');
   hint.className = 'page-hint';
-  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
+  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียดและติดตามความคืบหน้า</span>';
   shell.appendChild(hint);
-
-  const tabs = document.createElement('div');
-  tabs.className = 'page-tabs';
-  tabs.id = 'dashboard-tabs';
-  ['overview', 'calendar'].forEach(tab => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.tab = tab;
-    btn.className = 'tab-btn' + (App.dashboardTab === tab ? ' active' : '');
-    btn.innerHTML = tab === 'overview'
-      ? '<i class="fa-solid fa-list mr-1"></i> รายการสถานะ'
-      : '<i class="fa-solid fa-calendar-days mr-1"></i> ปฏิทิน';
-    btn.onclick = () => { App.dashboardTab = tab; showDashboard({ skipSidebar: true }); };
-    tabs.appendChild(btn);
-  });
-  shell.appendChild(tabs);
-
-  if (App.dashboardTab === 'calendar') {
-    renderCalendarPanel(shell);
-    content.appendChild(shell);
-    return;
-  }
 
   const { totalLics, expCount, warnCount } = getDashboardCounts();
   const grid = document.createElement('div');

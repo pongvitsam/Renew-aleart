@@ -83,10 +83,16 @@ const DataCache = {
     return { status: 'safe', text: 'ปกติ', color: 'text-emerald-600 bg-emerald-50 border-emerald-200' };
   },
 
+  getEffectiveAlertMonths(alertMonths) {
+    const perLicense = Number(alertMonths) || 3;
+    const minGlobal = Number(App?.settings?.minAlertMonths) || 3;
+    return Math.max(perLicense, minGlobal);
+  },
+
   licenseCounts(licenses) {
     let safe = 0, warning = 0, expired = 0;
     (licenses || []).forEach(l => {
-      const s = this.calculateStatus(l.expiryDate, l.alertMonths).status;
+      const s = this.calculateStatus(l.expiryDate, this.getEffectiveAlertMonths(l.alertMonths)).status;
       if (s === 'expired') expired++;
       else if (s === 'warning') warning++;
       else safe++;
@@ -127,7 +133,7 @@ const DataCache = {
     today.setHours(0, 0, 0, 0);
     let nearest = Infinity;
     (project.licenses || []).forEach(l => {
-      const s = this.calculateStatus(l.expiryDate, l.alertMonths);
+      const s = this.calculateStatus(l.expiryDate, this.getEffectiveAlertMonths(l.alertMonths));
       if (s.status === 'expired' || s.status === 'warning') {
         const exp = new Date(l.expiryDate + 'T12:00:00');
         const days = Math.ceil((exp - today) / (1000 * 60 * 60 * 24));
@@ -482,6 +488,7 @@ function refreshCurrentView(opts) {
 const App = {
   projects: [],
   departments: [],
+  settings: { minAlertMonths: 3 },
   expiryEvents: [],
   currentView: 'dashboard',
   currentProjectId: null,
@@ -668,6 +675,7 @@ const Api = {
       success: true,
       projects: data.projects,
       departments: data.departments || [],
+      settings: data.settings || { minAlertMonths: 3 },
       _fromSnapshot: true
     };
   },
@@ -720,13 +728,13 @@ const Api = {
 
     const pref = await this.consumeSnapshotPrefetch();
     if (pref) {
-      DataCache.set({ projects: pref.projects, departments: pref.departments });
+      DataCache.set({ projects: pref.projects, departments: pref.departments, settings: pref.settings });
       return pref;
     }
 
     const snap = await this.fetchSnapshot(budget);
     if (snap) {
-      DataCache.set({ projects: snap.projects, departments: snap.departments });
+      DataCache.set({ projects: snap.projects, departments: snap.departments, settings: snap.settings });
       return snap;
     }
 
@@ -772,7 +780,7 @@ const Api = {
     }
     if (json.success === false) throw new Error(json.error || 'API ล้มเหลว');
     if (action === 'getProjects' && json.projects) {
-      DataCache.set({ projects: json.projects, departments: json.departments });
+      DataCache.set({ projects: json.projects, departments: json.departments, settings: json.settings });
     }
     return json;
   },
@@ -823,8 +831,9 @@ const Api = {
   applyPayload(res) {
     if (res.projects) App.projects = res.projects;
     if (res.departments) App.departments = res.departments;
+    if (res.settings) App.settings = { ...App.settings, ...res.settings };
     if (res.projects) {
-      DataCache.set({ projects: App.projects, departments: App.departments });
+      DataCache.set({ projects: App.projects, departments: App.departments, settings: App.settings });
       App._projectsRev = (App._projectsRev || 0) + 1;
     }
     if (typeof rebuildAppIndex === 'function') rebuildAppIndex();
@@ -881,7 +890,7 @@ const Api = {
       .then(res => {
         const nextFp = this.payloadFingerprint(res);
         this.applyPayload(res);
-        DataCache.set({ projects: res.projects, departments: res.departments });
+        DataCache.set({ projects: res.projects, departments: res.departments, settings: res.settings || App.settings });
         hideSyncIndicator();
         if (nextFp !== prevFp && typeof refreshCurrentView === 'function') {
           refreshCurrentView({ forceFull: true });
@@ -919,7 +928,7 @@ const Api = {
         }
       });
     });
-    DataCache.set({ projects: App.projects, departments: App.departments });
+    DataCache.set({ projects: App.projects, departments: App.departments, settings: App.settings });
   },
 
   async saveProject(data) {
@@ -1007,6 +1016,17 @@ const Api = {
 
   deleteUser(data) {
     return this.call('deleteUser', data, { skipCache: true });
+  },
+
+  getSettings() {
+    return this.call('getSettings', {}, { skipCache: true });
+  },
+
+  saveSettings(data) {
+    return this.call('saveSettings', data, { skipCache: true }).then(res => {
+      this.scheduleBackgroundRefresh();
+      return res;
+    });
   },
 
 };
@@ -1338,6 +1358,47 @@ async function deleteDepartment(id) {
 
 Object.assign(window, {
   openDepartmentModal, addDepartment, deleteDepartment, populateDepartmentSelect
+});
+
+/* app-settings.js */
+function openSettingsModal() {
+  if (typeof updateSidebarNav === 'function') updateSidebarNav('settings');
+  const input = document.getElementById('settings-min-alert-months');
+  if (input) {
+    input.value = String(Number(App.settings?.minAlertMonths) || 3);
+  }
+  openModal('settingsModal');
+}
+
+async function saveAppSettings() {
+  const input = document.getElementById('settings-min-alert-months');
+  const minAlertMonths = Number(input?.value || 0);
+  if (!Number.isFinite(minAlertMonths) || minAlertMonths < 1) {
+    showToast('กรุณาระบุจำนวนเดือนอย่างน้อย 1', 'error');
+    return;
+  }
+
+  Utils.setLoading(true);
+  try {
+    const res = await Api.saveSettings({ minAlertMonths: minAlertMonths });
+    if (res && res.settings) {
+      App.settings = { ...App.settings, ...res.settings };
+    } else {
+      App.settings = { ...App.settings, minAlertMonths: minAlertMonths };
+    }
+    closeModal('settingsModal');
+    showToast('บันทึกการตั้งค่าแล้ว');
+    refreshCurrentView({ forceFull: true });
+  } catch (err) {
+    showToast('บันทึกการตั้งค่าไม่สำเร็จ: ' + err.message, 'error');
+  } finally {
+    Utils.setLoading(false);
+  }
+}
+
+Object.assign(window, {
+  openSettingsModal,
+  saveAppSettings
 });
 
 /* app-users.js */
@@ -1945,14 +2006,22 @@ const TimelineUI = {
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
 
+    const flow = document.createElement('div');
+    flow.className = 'timeline-flow';
+
     steps.forEach((step, idx) => {
       const done = roundHist.some(h => h.action === step);
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
+      const canSave = !done || current;
 
-      const row = document.createElement('div');
-      row.className = 'timeline-step' + (done ? ' done' : '') + (current ? ' current' : '');
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
+      row.disabled = !canSave;
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : 'บันทึกแล้ว';
+      row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
       dot.className = 'timeline-dot';
@@ -1978,21 +2047,23 @@ const TimelineUI = {
         body.appendChild(dt);
       }
 
-      if (!done && !current) {
-        const pin = document.createElement('button');
-        pin.type = 'button';
+      if (canSave) {
+        const pin = document.createElement('p');
         pin.className = 'text-[11px] text-indigo-600 font-bold mt-2';
-        pin.textContent = 'บันทึกขั้นตอนนี้';
-        pin.onclick = () => {
-          document.getElementById('update-step').value = step;
-          document.getElementById('update-note').focus();
-        };
+        pin.textContent = 'กดเพื่อบันทึกขั้นตอนนี้';
         body.appendChild(pin);
       }
 
       row.append(dot, body);
-      container.appendChild(row);
+      flow.appendChild(row);
+      if (idx < steps.length - 1) {
+        const arrow = document.createElement('div');
+        arrow.className = 'timeline-arrow';
+        arrow.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        flow.appendChild(arrow);
+      }
     });
+    container.appendChild(flow);
 
     const hint = document.createElement('p');
     hint.className = 'text-[11px] text-slate-500 mt-3 text-center';
@@ -2083,10 +2154,6 @@ function paintTimelineModal(license) {
   TimelineUI.render(license);
   RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
-  const select = document.getElementById('update-step');
-  select.replaceChildren();
-  select.append(new Option('-- เลือกขั้นตอน --', ''));
-  (license.steps || []).forEach(s => select.append(new Option(s, s, false, license.status === s)));
 }
 
 async function saveLicenseSteps() {
@@ -2120,6 +2187,13 @@ async function saveLicenseSteps() {
 
 window.renderTimeline = renderTimeline;
 window.saveLicenseSteps = saveLicenseSteps;
+
+function saveTimelineStepQuick(step) {
+  App._timelineQuickStep = step;
+  const stepEl = document.getElementById('update-step');
+  if (stepEl) stepEl.value = step;
+  saveTimelineUpdate();
+}
 
 /* app-renewal.js */
 const RenewalUI = {
@@ -2253,7 +2327,6 @@ async function saveCompleteRenewal(licenseId) {
 window.saveCompleteRenewal = saveCompleteRenewal;
 
 /* app-dashboard.js */
-App.dashboardTab = 'overview';
 App.dashboardStatusFilter = 'all';
 
 const DASHBOARD_STATUS_FILTERS = [
@@ -2304,7 +2377,7 @@ function updateDashboardFilterChips() {
 
 function patchDashboard() {
   const shell = document.getElementById('dashboard-shell');
-  if (!shell || App.dashboardTab === 'calendar') {
+  if (!shell) {
     showDashboard({ skipSidebar: true });
     return;
   }
@@ -2318,7 +2391,6 @@ function showDashboard(opts) {
   opts = opts || {};
   App.currentView = 'dashboard';
   App.currentProjectId = null;
-  App.dashboardTab = App.dashboardTab || 'overview';
   if (typeof updateSidebarNav === 'function') updateSidebarNav('dashboard');
   if (!opts.skipSidebar) renderSidebar(true);
 
@@ -2338,30 +2410,8 @@ function showDashboard(opts) {
 
   const hint = document.createElement('div');
   hint.className = 'page-hint';
-  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>เลือกแท็บด้านล่างเพื่อดูรายการหรือปฏิทิน — คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียด</span>';
+  hint.innerHTML = '<i class="fa-solid fa-circle-info"></i><span>คลิกชื่อโครงการในแถบซ้ายเพื่อเปิดรายละเอียดและติดตามความคืบหน้า</span>';
   shell.appendChild(hint);
-
-  const tabs = document.createElement('div');
-  tabs.className = 'page-tabs';
-  tabs.id = 'dashboard-tabs';
-  ['overview', 'calendar'].forEach(tab => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.dataset.tab = tab;
-    btn.className = 'tab-btn' + (App.dashboardTab === tab ? ' active' : '');
-    btn.innerHTML = tab === 'overview'
-      ? '<i class="fa-solid fa-list mr-1"></i> รายการสถานะ'
-      : '<i class="fa-solid fa-calendar-days mr-1"></i> ปฏิทิน';
-    btn.onclick = () => { App.dashboardTab = tab; showDashboard({ skipSidebar: true }); };
-    tabs.appendChild(btn);
-  });
-  shell.appendChild(tabs);
-
-  if (App.dashboardTab === 'calendar') {
-    renderCalendarPanel(shell);
-    content.appendChild(shell);
-    return;
-  }
 
   const { totalLics, expCount, warnCount } = getDashboardCounts();
   const grid = document.createElement('div');
@@ -2679,12 +2729,6 @@ function renderProjectView(projectId) {
     emailTags.append(none);
   }
   emailWrap.append(emailTags);
-  const testBtn = document.createElement('button');
-  testBtn.type = 'button';
-  testBtn.className = 'text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-lg border mt-2';
-  testBtn.textContent = 'ทดสอบส่งแจ้งเตือน';
-  testBtn.onclick = () => openTestEmailModal(project.id);
-  emailWrap.append(testBtn);
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';
@@ -2898,7 +2942,7 @@ async function saveProject() {
 
 function openLicenseModal() {
   document.getElementById('license-name').value = '';
-  document.getElementById('license-alert-months').value = '3';
+  document.getElementById('license-alert-months').value = String(Number(App.settings?.minAlertMonths) || 3);
   document.getElementById('license-steps').value =
     '1. แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง\n2. ขอเอกสารสนับสนุนจากลูกค้า\n3. ได้รับเอกสารครบถ้วน\n4. ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ\n5. แจ้งผลให้ลูกค้าทราบ\n6. เสร็จสิ้นสมบูรณ์';
   const issueHost = document.getElementById('license-issue-date-mount');
@@ -2938,7 +2982,8 @@ async function saveLicense() {
 
 async function saveTimelineUpdate() {
   const licenseId = document.getElementById('update-license-id').value;
-  const step = document.getElementById('update-step').value;
+  const stepEl = document.getElementById('update-step');
+  const step = (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
   const note = document.getElementById('update-note').value.trim();
   if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
 
@@ -2953,6 +2998,8 @@ async function saveTimelineUpdate() {
   } catch (err) {
     showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
     Api.refreshInBackground();
+  } finally {
+    App._timelineQuickStep = '';
   }
 }
 

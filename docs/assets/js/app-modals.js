@@ -140,7 +140,7 @@ async function saveProject() {
 
 function openLicenseModal() {
   document.getElementById('license-name').value = '';
-  document.getElementById('license-alert-months').value = '3';
+  document.getElementById('license-alert-months').value = String(Number(App.settings?.minAlertMonths) || 3);
   document.getElementById('license-steps').value =
     '1. แจ้งผู้รับเหมา/ทีมงานที่เกี่ยวข้อง\n2. ขอเอกสารสนับสนุนจากลูกค้า\n3. ได้รับเอกสารครบถ้วน\n4. ยื่นดำเนินการต่อใบอนุญาตกับหน่วยงานรัฐ\n5. แจ้งผลให้ลูกค้าทราบ\n6. เสร็จสิ้นสมบูรณ์';
   const issueHost = document.getElementById('license-issue-date-mount');
@@ -180,7 +180,8 @@ async function saveLicense() {
 
 async function saveTimelineUpdate() {
   const licenseId = document.getElementById('update-license-id').value;
-  const step = document.getElementById('update-step').value;
+  const stepEl = document.getElementById('update-step');
+  const step = (stepEl ? stepEl.value : '') || App._timelineQuickStep || '';
   const note = document.getElementById('update-note').value.trim();
   if (!step && !note) return showToast('กรุณาระบุขั้นตอนหรือหมายเหตุ', 'error');
 
@@ -195,6 +196,8 @@ async function saveTimelineUpdate() {
   } catch (err) {
     showToast('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message, 'error');
     Api.refreshInBackground();
+  } finally {
+    App._timelineQuickStep = '';
   }
 }
 

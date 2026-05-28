@@ -1,4 +1,6 @@
 var SheetService = (function () {
+  var MIN_ALERT_MONTHS_KEY_ = 'MIN_ALERT_MONTHS';
+  var DEFAULT_MIN_ALERT_MONTHS_ = 3;
 
   function setupSpreadsheet() {
     var ss = SpreadsheetApp.create('Renew Aleart - License');
@@ -232,7 +234,8 @@ var SheetService = (function () {
     var licenseRows = readTable_(CONFIG.SHEETS.LICENSES);
     var payload = {
       projects: buildProjectsFromRows_(projectRows, licenseRows, false, {}, true),
-      departments: DepartmentService.getDepartmentsFromProjectRows_(projectRows)
+      departments: DepartmentService.getDepartmentsFromProjectRows_(projectRows),
+      settings: getSettings_()
     };
     PayloadCache.set(payload);
     return payload;
@@ -411,13 +414,15 @@ var SheetService = (function () {
       existing = getLicenseRow_(id);
       if (existing) existingCycles = existing.renewalCycles || '[]';
     }
+    var minAlert = getMinAlertMonths_();
+    var alertMonths = Math.max(Number(data.alertMonths) || 3, minAlert);
     var newId = upsertRow_(CONFIG.SHEETS.LICENSES, id, {
       id: id || '',
       projectId: data.projectId,
       name: data.name,
       issueDate: data.issueDate,
       expiryDate: data.expiryDate,
-      alertMonths: data.alertMonths || 3,
+      alertMonths: alertMonths,
       driveUrl: data.driveUrl || '',
       status: data.status || (existing && existing.status) || 'รอเริ่มดำเนินการ',
       steps: JSON.stringify(steps),
@@ -580,6 +585,54 @@ var SheetService = (function () {
     invalidateCache_();
   }
 
+  function getMinAlertMonths_() {
+    var raw = PropertiesService.getScriptProperties().getProperty(MIN_ALERT_MONTHS_KEY_);
+    var n = Number(raw);
+    if (!isFinite(n) || n < 1) return DEFAULT_MIN_ALERT_MONTHS_;
+    return Math.floor(n);
+  }
+
+  function getSettings_() {
+    return {
+      minAlertMonths: getMinAlertMonths_()
+    };
+  }
+
+  function saveSettings(data) {
+    var minAlertMonths = Number(data && data.minAlertMonths);
+    if (!isFinite(minAlertMonths) || minAlertMonths < 1) {
+      throw new Error('กรุณาระบุจำนวนเดือนอย่างน้อย 1');
+    }
+    minAlertMonths = Math.floor(minAlertMonths);
+    PropertiesService.getScriptProperties().setProperty(MIN_ALERT_MONTHS_KEY_, String(minAlertMonths));
+
+    var ss = ensureInitialized();
+    var licSheet = ss.getSheetByName(CONFIG.SHEETS.LICENSES);
+    if (licSheet) {
+      var lastRow = licSheet.getLastRow();
+      var lastCol = licSheet.getLastColumn();
+      if (lastRow >= 2 && lastCol >= 1) {
+        var all = licSheet.getRange(1, 1, lastRow, lastCol).getValues();
+        var headers = all[0];
+        var alertCol = headers.indexOf('alertMonths');
+        var updatedCol = headers.indexOf('updatedAt');
+        if (alertCol >= 0) {
+          for (var r = 1; r < all.length; r++) {
+            var cur = Number(all[r][alertCol]) || DEFAULT_MIN_ALERT_MONTHS_;
+            if (cur < minAlertMonths) {
+              all[r][alertCol] = minAlertMonths;
+              if (updatedCol >= 0) all[r][updatedCol] = new Date().toISOString();
+            }
+          }
+          licSheet.getRange(2, 1, lastRow - 1, lastCol).setValues(all.slice(1));
+        }
+      }
+    }
+
+    invalidateCache_();
+    return { success: true, settings: getSettings_() };
+  }
+
   return {
     invalidateCache_: invalidateCache_,
     setupSpreadsheet: setupSpreadsheet,
@@ -592,6 +645,8 @@ var SheetService = (function () {
     saveLicenseSteps: saveLicenseSteps,
     saveTimelineUpdate: saveTimelineUpdate,
     completeRenewal: completeRenewal,
+    saveSettings: saveSettings,
+    getSettings: getSettings_,
     addHistoryEntry: addHistoryEntry,
     readTable_: readTable_,
     appendRow_: appendRow_,

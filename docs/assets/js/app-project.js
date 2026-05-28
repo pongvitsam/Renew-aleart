@@ -76,12 +76,6 @@ function renderProjectView(projectId) {
     emailTags.append(none);
   }
   emailWrap.append(emailTags);
-  const testBtn = document.createElement('button');
-  testBtn.type = 'button';
-  testBtn.className = 'text-xs bg-indigo-50 text-indigo-600 font-bold px-3 py-1 rounded-lg border mt-2';
-  testBtn.textContent = 'ทดสอบส่งแจ้งเตือน';
-  testBtn.onclick = () => openTestEmailModal(project.id);
-  emailWrap.append(testBtn);
 
   const addBtn = document.createElement('button');
   addBtn.type = 'button';

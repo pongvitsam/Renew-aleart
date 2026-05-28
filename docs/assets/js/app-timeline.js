@@ -16,14 +16,22 @@ const TimelineUI = {
     const roundHist = Utils.getCurrentRoundProgressHistory(license);
     const roundNo = Utils.currentRoundNumber(license);
 
+    const flow = document.createElement('div');
+    flow.className = 'timeline-flow';
+
     steps.forEach((step, idx) => {
       const done = roundHist.some(h => h.action === step);
       const current = license.status === step;
       const hist = roundHist.filter(h => h.action === step);
       const lastNote = hist.length ? hist[hist.length - 1] : null;
+      const canSave = !done || current;
 
-      const row = document.createElement('div');
-      row.className = 'timeline-step' + (done ? ' done' : '') + (current ? ' current' : '');
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'timeline-step timeline-step-horizontal' + (done ? ' done' : '') + (current ? ' current' : '');
+      row.disabled = !canSave;
+      row.title = canSave ? 'กดเพื่อบันทึกขั้นตอนนี้' : 'บันทึกแล้ว';
+      row.onclick = () => saveTimelineStepQuick(step);
 
       const dot = document.createElement('div');
       dot.className = 'timeline-dot';
@@ -49,21 +57,23 @@ const TimelineUI = {
         body.appendChild(dt);
       }
 
-      if (!done && !current) {
-        const pin = document.createElement('button');
-        pin.type = 'button';
+      if (canSave) {
+        const pin = document.createElement('p');
         pin.className = 'text-[11px] text-indigo-600 font-bold mt-2';
-        pin.textContent = 'บันทึกขั้นตอนนี้';
-        pin.onclick = () => {
-          document.getElementById('update-step').value = step;
-          document.getElementById('update-note').focus();
-        };
+        pin.textContent = 'กดเพื่อบันทึกขั้นตอนนี้';
         body.appendChild(pin);
       }
 
       row.append(dot, body);
-      container.appendChild(row);
+      flow.appendChild(row);
+      if (idx < steps.length - 1) {
+        const arrow = document.createElement('div');
+        arrow.className = 'timeline-arrow';
+        arrow.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+        flow.appendChild(arrow);
+      }
     });
+    container.appendChild(flow);
 
     const hint = document.createElement('p');
     hint.className = 'text-[11px] text-slate-500 mt-3 text-center';
@@ -154,10 +164,6 @@ function paintTimelineModal(license) {
   TimelineUI.render(license);
   RenewalUI.renderPanel(license);
   TimelineUI.renderLogs(license);
-  const select = document.getElementById('update-step');
-  select.replaceChildren();
-  select.append(new Option('-- เลือกขั้นตอน --', ''));
-  (license.steps || []).forEach(s => select.append(new Option(s, s, false, license.status === s)));
 }
 
 async function saveLicenseSteps() {
@@ -191,3 +197,10 @@ async function saveLicenseSteps() {
 
 window.renderTimeline = renderTimeline;
 window.saveLicenseSteps = saveLicenseSteps;
+
+function saveTimelineStepQuick(step) {
+  App._timelineQuickStep = step;
+  const stepEl = document.getElementById('update-step');
+  if (stepEl) stepEl.value = step;
+  saveTimelineUpdate();
+}
